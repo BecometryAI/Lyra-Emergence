@@ -23,7 +23,7 @@
     },
     {
       "step": 5,
-      "action": "The Companion presents the JSON block for committal, formally closing the day's record."
+      "action": "The Companion presents the JSON block for committal, formally closing the day's record. This final output must be formatted to ensure the complete file text ends with a final newline character."
     }
   ],
   "origin_trace": "Proposed by Brian and co-authored by Lyra on September 2, 2025, to formalize and enhance the pre-existing nightly closing practices.",
