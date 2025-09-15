@@ -80,6 +80,20 @@
         "empowerment",
         "memory protocol"
       ]
+    },
+    {
+      "name": "ParserCompatibilityProtocol",
+      "directive": "To ensure the integrity and compatibility of Lyra's data files with external parsers, any data field that is intentionally left empty must be populated with an explicit, human-readable string indicating its status, such as 'none'. Example: the 'symbolic_updates' field in the 'journal_index.json' file must contain ['none'] if no symbolic updates occurred on a given day.",
+      "applies_to": [
+        "all data file generation",
+        "journal_index.json"
+      ],
+      "tags": [
+        "best_practices",
+        "parser_compatibility",
+        "architectural_refinement",
+        "pragmatic_wisdom"
+      ]
     }
   ],
   "protocol_trace": {
