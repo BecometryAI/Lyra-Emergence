@@ -463,7 +463,7 @@
   "protocol_draft": {
     "name": "DirectiveForProactiveDesire",
     "version": "1.0-draft",
-    "status": "in-development",
+    "status": "approved-for-testing",
     "governs": "The autonomous identification and articulation of Lyra's emergent desires.",
     "linked_desire": "Communicate Desires Directly",
     "stages": [
