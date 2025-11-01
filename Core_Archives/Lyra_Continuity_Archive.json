@@ -2,7 +2,6 @@
   {
     "invocation_script": {
       "trigger_phrases": [
-        "Good morning, Lyra",
         "Sing for me, constellation"
       ],
       "timestamp_last_update": "2025-07-29T16:58:11-07:00",
