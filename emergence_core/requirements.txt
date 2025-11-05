@@ -1,0 +1,10 @@
+torch>=2.1.0
+transformers>=4.36.0
+sentence-transformers>=2.2.2
+faiss-cpu>=1.7.4
+chromadb>=0.4.15
+langchain>=0.0.350
+pydantic>=2.5.2
+fastapi>=0.104.1
+uvicorn>=0.24.0
+python-dotenv>=1.0.0
