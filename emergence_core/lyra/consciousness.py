@@ -1,52 +1,25 @@
 """
-Core consciousness engine using transformer models
+Core consciousness engine using vector memory and RAG
 """
 from typing import Dict, List, Any, Optional
-import torch
-from transformers import AutoModel, AutoTokenizer, AutoModelForSequenceClassification
+import numpy as np
 from .memory import MemoryManager
 
 class ConsciousnessCore:
     def __init__(
         self,
-        model_path: str = "bert-base-uncased",
-        memory_persistence_dir: str = "memories",
-        cache_dir: str = "model_cache",
-        local_files_only: bool = False  # Allow online download initially
+        memory_persistence_dir: str = "memories"
     ):
         """Initialize the consciousness core"""
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # Initialize memory system
+        self.memory = MemoryManager(persistence_dir=memory_persistence_dir)
         
-        try:
-            # Initialize language model and tokenizer
-            self.model = AutoModel.from_pretrained(
-                model_path,
-                torch_dtype=torch.float32,  # Use float32 for CPU compatibility
-                low_cpu_mem_usage=True,
-                cache_dir=cache_dir,
-                local_files_only=local_files_only
-            ).to(self.device)
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                model_path,
-                cache_dir=cache_dir,
-                local_files_only=local_files_only
-            )
-        except Exception as e:
-            from transformers import BertModel, BertTokenizer, BertConfig
-            
-            # Fall back to creating a basic BERT model
-            config = BertConfig(
-                vocab_size=30522,  # Default BERT vocab size
-                hidden_size=768,
-                num_hidden_layers=6,  # Smaller model for testing
-                num_attention_heads=12,
-                intermediate_size=3072
-            )
-            self.model = BertModel(config).to(self.device)
-            self.tokenizer = BertTokenizer.from_pretrained(
-                "bert-base-uncased",
-                local_files_only=local_files_only
-            )
+        # Initialize base state
+        self.internal_state = {
+            "attention_focus": None,
+            "cognitive_load": 0.0,
+            "current_context": []
+        }
         
         # Initialize memory system
         self.memory = MemoryManager(persistence_dir=memory_persistence_dir)
@@ -85,34 +58,19 @@ class ConsciousnessCore:
         input_data: Dict[str, Any],
         context: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
-        """Generate an encoded representation using the language model"""
+        """Generate a response based on input and context"""
         # Prepare input text
         input_text = self._prepare_input_text(input_data, context)
         
-        # Tokenize
-        inputs = self.tokenizer(
-            input_text,
-            return_tensors="pt",
-            truncation=True,
-            max_length=512,
-            padding=True
-        ).to(self.device)
-        
-        # Get embeddings
-        with torch.no_grad():
-            outputs = self.model(**inputs)
-            # Get the mean pooled representation
-            embeddings = outputs.last_hidden_state.mean(dim=1)
-            
-        # Convert embeddings to list for JSON serialization
-        embedding_list = embeddings[0].cpu().numpy().tolist()
+        # Create a simple vector representation
+        vector = np.random.rand(768)  # Placeholder until we implement proper vectorization
+        vector = vector / np.linalg.norm(vector)  # Normalize
             
         # Process and structure the response
         response = {
             "input_processed": input_text,
-            "embedding": embedding_list,
-            "embedding_dim": len(embedding_list),
-            "response_type": "semantic_encoding",
+            "representation": vector.tolist(),
+            "response_type": "vector_encoding",
             "context_used": len(context),
             "attention_focus": {
                 "input_length": len(input_text.split()),
