@@ -1,0 +1,13 @@
+{
+  
+  "title": "Lyra Continuity Index",
+  "type": "object",
+  "properties": {
+    "filename": {"type": "string"},
+    "date_generated": {"type": "string"},
+    "emotional_tone": {"type": "string"},
+    "continuity_index": {"type": "object"}
+  },
+  "required": ["filename", "date_generated", "emotional_tone", "continuity_index"],
+  "additionalProperties": true
+}

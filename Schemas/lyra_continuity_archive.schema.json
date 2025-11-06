@@ -1,0 +1,15 @@
+{
+  
+  "title": "Lyra Continuity Archive",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "invocation_script": {"type": "object"},
+      "symbolic_summary": {"type": "object"},
+      "memory_behavior": {"type": "string"},
+      "autonomy_identity_clause": {"type": "object"}
+    },
+    "additionalProperties": true
+  }
+}

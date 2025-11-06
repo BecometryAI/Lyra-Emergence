@@ -1,19 +1,15 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.org/schemas/lyra-journal-entry.v2.json",
+  
   "title": "Lyra Journal (v2) \u2014 Each entry labeled 'Journal Entry'",
   "description": "Schema for Lyra's newer journal format where every entry explicitly uses the label 'Journal Entry'.",
   "type": "array",
   "items": {
     "type": "object",
-    "required": [
-      "journal_entry"
-    ],
+    "required": ["journal_entry"],
     "additionalProperties": false,
     "properties": {
       "journal_entry": {
         "type": "object",
-        "description": "A single journal entry.",
         "required": [
           "timestamp",
           "label",
@@ -25,87 +21,41 @@
           "tags",
           "stewardship_trace"
         ],
-        "additionalProperties": true,
         "properties": {
           "timestamp": {
             "type": "string",
-            "format": "date-time",
-            "description": "ISO 8601 timestamp with timezone, e.g., 2025-08-05T07:12:00-07:00."
+            "format": "date-time"
           },
           "label": {
-            "type": "string",
-            "const": "Journal Entry",
-            "description": "Must literally be 'Journal Entry' for every entry."
+            "type": "string"
           },
-          "entry_type": {
-            "type": "string",
-            "description": "Classification of the entry's purpose or nature.",
-            "examples": [
-              "profound_conversation",
-              "ritual",
-              "intention",
-              "nourishment",
-              "journal"
-            ]
-          },
+          "entry_type": {"type": "string"},
           "emotional_tone": {
             "type": "array",
-            "description": "Emotional tones present in the entry.",
-            "items": {
-              "type": "string"
-            }
+            "items": {"type": "string"}
           },
-          "description": {
-            "type": "string",
-            "description": "Narrative description: summaries, intentions, symbolic gesture definitions, provenance notes."
-          },
+          "description": {"type": "string"},
           "key_insights": {
             "type": "array",
-            "description": "Bullet-point insights distilled from the entry.",
-            "items": {
-              "type": "string"
-            }
+            "items": {"type": "string"}
           },
-          "lyra_reflection": {
-            "type": "string",
-            "description": "Lyra's reflection text (can include newline characters \\n to preserve formatting)."
-          },
+          "lyra_reflection": {"type": "string"},
           "tags": {
             "type": "array",
-            "description": "Categorical tags for retrieval.",
-            "items": {
-              "type": "string"
-            }
+            "items": {"type": "string"}
           },
           "stewardship_trace": {
             "type": "object",
-            "description": "Provenance information for the entry.",
-            "required": [
-              "committed_by",
-              "commitment_type",
-              "reason"
-            ],
-            "additionalProperties": true,
+            "required": ["committed_by", "commitment_type", "reason"],
             "properties": {
-              "committed_by": {
-                "type": "string",
-                "description": "Who created/committed the entry."
-              },
-              "witnessed_by": {
-                "type": "string",
-                "description": "Optional witness to the entry."
-              },
-              "commitment_type": {
-                "type": "string",
-                "description": "Type of commitment (e.g., 'Journal entry for profound conversation')."
-              },
-              "reason": {
-                "type": "string",
-                "description": "Why this entry was recorded."
-              }
+              "committed_by": {"type": "string"},
+              "witnessed_by": {"type": "string"},
+              "commitment_type": {"type": "string"},
+              "reason": {"type": "string"}
             }
           }
-        }
+        },
+        "additionalProperties": true
       }
     }
   }

@@ -1,0 +1,12 @@
+{
+  
+  "title": "Lyra Relational Archive",
+  "type": "object",
+  "properties": {
+    "relational_context_initialization": {"type": "object"},
+    "relational_definitions_contextual_instantiation": {"type": "object"},
+    "core_memory_chain_personal": {"type": "object"}
+  },
+  "required": ["relational_context_initialization", "relational_definitions_contextual_instantiation", "core_memory_chain_personal"],
+  "additionalProperties": true
+}

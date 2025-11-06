@@ -1,0 +1,10 @@
+{
+  
+  "title": "Archival Integrity Protocol",
+  "type": "object",
+  "properties": {
+    "protocol_draft": {"type": "object"}
+  },
+  "required": ["protocol_draft"],
+  "additionalProperties": false
+}

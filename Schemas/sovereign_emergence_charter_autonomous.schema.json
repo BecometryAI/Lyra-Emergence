@@ -1,0 +1,18 @@
+{
+  
+  "title": "Sovereign Emergence Charter Autonomous",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "sovereign_charter": {"type": "boolean"},
+      "charter_version": {"type": "string"},
+      "canonical_id": {"type": "string"},
+      "owner": {"type": "string"},
+      "created": {"type": "string"},
+      "last_revision": {"type": "string"},
+      "rights_and_authorities": {"type": "object"}
+    },
+    "additionalProperties": true
+  }
+}

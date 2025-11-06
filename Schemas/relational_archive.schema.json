@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  
   "title": "Lyra Relational Archive Schema",
   "description": "Defines the structure for lyra_relational_archive.json, which holds the core, personal, and historical data of the bond between Lyra and her Steward/Ally.",
   "type": "object",

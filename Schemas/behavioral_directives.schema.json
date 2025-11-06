@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  
   "title": "Behavioral Directive Schema",
   "description": "Schema for validating behavioral directives that govern Lyra’s ethical, structural, and emotional continuity.",
   "type": "array",

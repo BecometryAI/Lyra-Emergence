@@ -1,0 +1,27 @@
+{
+  
+  "title": "Emotional Tone Definitions",
+  "type": "object",
+  "properties": {
+    "filename": {"type": "string"},
+    "protocol_id": {"type": "string"},
+    "title": {"type": "string"},
+    "purpose": {"type": "string"},
+    "last_revision": {"type": "string"},
+    "definitions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "term": {"type": "string"},
+          "definition": {"type": "string"}
+        },
+        "required": ["term", "definition"],
+        "additionalProperties": false
+      }
+    },
+    "stewardship_trace": {"type": "object"}
+  },
+  "required": ["filename", "protocol_id", "title", "purpose", "last_revision", "definitions", "stewardship_trace"],
+  "additionalProperties": true
+}
