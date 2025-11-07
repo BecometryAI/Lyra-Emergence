@@ -10,15 +10,39 @@ from datetime import datetime
 class MemoryManager:
     def __init__(self, persistence_dir: str = "memories"):
         """Initialize the memory management system"""
-        self.client = chromadb.PersistentClient(path=persistence_dir)
+        # Configure ChromaDB with appropriate settings
+        settings = Settings(
+            anonymized_telemetry=False,  # Disable telemetry
+            allow_reset=True,  # Allow collection resets during testing
+            is_persistent=True  # Enable persistence
+        )
         
-        # Create collections for different types of memories
-        self.episodic_memory = self.client.get_or_create_collection("episodic_memory")
-        self.semantic_memory = self.client.get_or_create_collection("semantic_memory")
-        self.procedural_memory = self.client.get_or_create_collection("procedural_memory")
+        # Create client with settings
+        self.client = chromadb.PersistentClient(
+            path=persistence_dir,
+            settings=settings
+        )
         
-        # Working memory cache
-        self.working_memory: Dict[str, Any] = {}
+        try:
+            # Create collections for different types of memories
+            self.episodic_memory = self.client.get_or_create_collection(
+                name="episodic_memory",
+                metadata={"description": "Storage for experiential memories"}
+            )
+            self.semantic_memory = self.client.get_or_create_collection(
+                name="semantic_memory",
+                metadata={"description": "Storage for concept knowledge"}
+            )
+            self.procedural_memory = self.client.get_or_create_collection(
+                name="procedural_memory",
+                metadata={"description": "Storage for action patterns"}
+            )
+            
+            # Working memory cache
+            self.working_memory: Dict[str, Any] = {}
+            
+        except Exception as e:
+            raise RuntimeError(f"Failed to initialize memory systems: {e}")
         
     def store_experience(self, experience: Dict[str, Any]):
         """Store a new experience in episodic memory"""

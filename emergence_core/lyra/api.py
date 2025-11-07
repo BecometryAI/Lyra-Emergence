@@ -11,16 +11,43 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Lyra Emergence API")
+def create_app():
+    """Create and configure the FastAPI application"""
+    app = FastAPI(title="Lyra Emergence API")
+    
+    # Initialize consciousness core
+    try:
+        logger.info("Initializing consciousness core...")
+        consciousness = ConsciousnessCore()
+        logger.info("Consciousness core initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize consciousness core: {e}")
+        raise
 
-# Initialize consciousness core
-try:
-    logger.info("Initializing consciousness core...")
-    consciousness = ConsciousnessCore()
-    logger.info("Consciousness core initialized successfully")
-except Exception as e:
-    logger.error(f"Failed to initialize consciousness core: {e}")
-    raise
+    @app.get("/health")
+    async def health_check():
+        """Check if the system is healthy"""
+        return {"status": "ok", "message": "System is healthy"}
+
+    @app.get("/state")
+    async def get_state():
+        """Get the current state of the consciousness system"""
+        return {"state": consciousness.get_state()}
+
+    @app.post("/process")
+    async def process_input(data: Dict[str, Any]):
+        """Process input through the consciousness system"""
+        try:
+            response = consciousness.process_input(data)
+            return response
+        except Exception as e:
+            logger.error(f"Error processing input: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    app.state.consciousness = consciousness
+    return app
+
+app = create_app()
 
 class Input(BaseModel):
     """Input data model"""
@@ -34,13 +61,26 @@ class Response(BaseModel):
     status: str = "success"
     message: Optional[str] = None
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    try:
+        state = app.state.consciousness.get_internal_state()
+        return {
+            "status": "healthy", 
+            "consciousness_state": "active",
+            "version": "0.1.0"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/process", response_model=Response)
 async def process_input(input_data: Input):
     """Process input through the consciousness core"""
     try:
         logger.info(f"Processing input of type: {input_data.type}")
-        response = consciousness.process_input(input_data.content)
-        internal_state = consciousness.get_internal_state()
+        response = app.state.consciousness.process_input(input_data.content)
+        internal_state = app.state.consciousness.get_internal_state()
         
         return Response(
             response=response,
@@ -56,7 +96,7 @@ async def process_input(input_data: Input):
 async def get_state():
     """Get current internal state"""
     try:
-        state = consciousness.get_internal_state()
+        state = app.state.consciousness.get_internal_state()
         return {
             "status": "success",
             "state": state
@@ -64,11 +104,3 @@ async def get_state():
     except Exception as e:
         logger.error(f"Error getting state: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "version": "0.1.0"
-    }

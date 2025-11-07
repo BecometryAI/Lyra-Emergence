@@ -17,18 +17,9 @@ class ConsciousnessCore:
         # Initialize base state
         self.internal_state = {
             "attention_focus": None,
+            "emotional_valence": 0.0,
             "cognitive_load": 0.0,
             "current_context": []
-        }
-        
-        # Initialize memory system
-        self.memory = MemoryManager(persistence_dir=memory_persistence_dir)
-        
-        # Internal state tracking
-        self.internal_state = {
-            "attention_focus": None,
-            "emotional_valence": 0.0,
-            "cognitive_load": 0.0
         }
     
     def process_input(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -53,6 +44,10 @@ class ConsciousnessCore:
         
         return response
     
+    def get_state(self) -> Dict[str, Any]:
+        """Get the current internal state of the consciousness system"""
+        return self.internal_state
+
     def _generate_response(
         self,
         input_data: Dict[str, Any],
