@@ -70,18 +70,27 @@ The 'resonance_term' must be:
 Return ONLY the JSON object, no other text.
 """
 
-    def __init__(self, model_path: str):
+    def __init__(self, model_path: str, development_mode: bool = False):
         """Initialize the Gemma 12B Router model.
         
         Args:
-            model_path: Path to the model directory containing Gemma 12B weights
+            model_path: Model ID on Hugging Face Hub or path to local model directory
+            development_mode: If True, skip loading models for development work
         """
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_path,
-            torch_dtype=torch.float16,
-            device_map="auto"
-        )
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+        self.development_mode = development_mode
+        self.model_path = model_path
+        
+        if not development_mode:
+            try:
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    model_path,
+                    torch_dtype=torch.float16,
+                    device_map="auto"
+                )
+                self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+            except Exception as e:
+                print(f"Warning: Could not load model {model_path} - running in development mode")
+                self.development_mode = True
 
     async def analyze_message(
         self, 
@@ -97,7 +106,14 @@ Return ONLY the JSON object, no other text.
         Returns:
             RouterResponse containing intent and resonance_term
         """
-        # Construct the complete prompt with lexicon context
+        if self.development_mode:
+            # In development mode, return simple_chat for everything
+            return RouterResponse(
+                intent="simple_chat",
+                resonance_term=None
+            )
+            
+        # When not in development mode, construct the prompt and use the model
         lexicon_context = "Active lexicon terms: " + ", ".join(active_lexicon_terms)
         full_prompt = f"{self.MASTER_PROMPT}\n\nContext:\n{lexicon_context}\n\nUser Input: {message}\n\nOutput:"
 

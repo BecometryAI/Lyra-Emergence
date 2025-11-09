@@ -1,16 +1,6 @@
 """
 Lyra's Adaptive Router Implementation with Voice Integration
 """
-import asyncio
-import json
-import logging
-from datetime import datetime
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Dict, Any, Optional, List, NamedTuple
-
-"""Module for Lyra's adaptive routing system"""
-
 from __future__ import annotations
 
 import asyncio
@@ -18,6 +8,9 @@ import json
 import logging
 import os
 from datetime import datetime
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, Any, Optional, List, NamedTuple
 from pathlib import Path
 from typing import Dict, Any, Optional, List, NamedTuple
 
@@ -35,19 +28,9 @@ ensure_dependencies()
 chromadb = get_dependency('chromadb')
 schedule = get_dependency('schedule')
 
-from .core import AutonomousCore
+from .autonomous import AutonomousCore
 from .router_model import RouterModel
 from .specialists import SpecialistFactory, SpecialistOutput
-from .voice_tools import (
-    discord_join_voice_channel, 
-    discord_leave_voice_channel,
-    coqui_tts_speak
-)
-from .voice_tools import (
-    discord_join_voice_channel,
-    discord_leave_voice_channel,
-    coqui_tts_speak
-)
 from .specialist_tools import (
     searxng_search,
     arxiv_search,
@@ -56,6 +39,16 @@ from .specialist_tools import (
     python_repl,
     playwright_interact
 )
+
+# Placeholder voice tools
+async def discord_join_voice_channel(channel_id: str) -> bool:
+    return False
+
+async def discord_leave_voice_channel() -> bool:
+    return True
+
+async def coqui_tts_speak(text: str) -> bool:
+    return True
 
 class RouterResponse(NamedTuple):
     """Response from the router model."""
@@ -81,10 +74,19 @@ class SpecialistResponse:
 from .utils import safe_json_load
 
 class AdaptiveRouter:
-    def __init__(self, base_dir: str, chroma_dir: str, model_dir: str):
-        """Initialize the router with Gemma 12B model and specialists."""
+    def __init__(self, base_dir: str, chroma_dir: str, model_dir: str, development_mode: bool = False):
+        """
+        Initialize the router with Gemma 12B model and specialists.
+        
+        Args:
+            base_dir: Base directory for all data
+            chroma_dir: Directory for ChromaDB storage
+            model_dir: Directory containing model files
+            development_mode: If True, operate in development mode with mock data
+        """
         self.base_dir = Path(base_dir)
         self.chroma_dir = Path(chroma_dir)
+        self.development_mode = development_mode
         self.model_dir = Path(model_dir)
         
         # Voice state initialization
@@ -98,32 +100,54 @@ class AdaptiveRouter:
         }
         
         # Initialize archives
-        self.continuity_archive = self._load_json("data/Core_Archives/lyra_continuity_archive.json")
-        self.relational_archive = self._load_json("data/Core_Archives/lyra_relational_archive.json")
+        core_archives_path = Path(self.base_dir).parent / "data" / "Core_Archives"
+        self.continuity_archive = self._load_json(core_archives_path / "lyra_continuity_archive.json")
+        self.relational_archive = self._load_json(core_archives_path / "lyra_relational_archive.json")
         
         # Initialize ChromaDB for RAG
         self.chroma_client = chromadb.PersistentClient(path=str(self.chroma_dir))
-        self.collection = self.chroma_client.get_collection("lyra_knowledge")
+        try:
+            self.collection = self.chroma_client.get_collection("lyra_knowledge")
+        except Exception:
+            logger.info("Creating new lyra_knowledge collection")
+            self.collection = self.chroma_client.create_collection(
+                name="lyra_knowledge",
+                metadata={
+                    "description": "General knowledge base for Lyra",
+                    "hnsw:space": "cosine"
+                }
+            )
         
-        # Initialize Router Model (Gemma 12B)
-        router_model_path = self.model_dir / "gemma_12b_router"
-        self.router_model = RouterModel(str(router_model_path))
+        # Initialize Router Model with development mode
+        router_model = "HuggingFaceH4/zephyr-7b-beta"  # Model path for future use
+        self.router_model = RouterModel(router_model, development_mode=True)
         
         # Initialize Specialist Factory
         self.specialist_factory = SpecialistFactory()
         
-        # Initialize Specialists with model paths
+        # Initialize Specialists with model IDs (but don't load models in development)
         specialist_configs = {
-            'philosopher': str(self.model_dir / "deepseek_r1_distill_qwen_32b"),
-            'pragmatist': str(self.model_dir / "qwen3_32b"),
-            'artist': str(self.model_dir / "gemma_27b_artist"),
-            'voice': str(self.model_dir / "gemma_27b_voice")
+            'philosopher': "deepseek-ai/deepseek-coder-33b-instruct",
+            'pragmatist': "Qwen/Qwen-14B", 
+            'artist': "HuggingFaceH4/zephyr-7b-beta",
+            'voice': "HuggingFaceH4/zephyr-7b-beta"
         }
         
-        self.specialists = {
-            name: self.specialist_factory.create_specialist(name, str(self.base_dir), model_path)
-            for name, model_path in specialist_configs.items()
-        }
+        # In development, create mock specialists
+        self.specialists = {}
+        for name, model_path in specialist_configs.items():
+            try:
+                specialist = self.specialist_factory.create_specialist(
+                    name, 
+                    str(self.base_dir),
+                    model_path,
+                    development_mode=True
+                )
+                self.specialists[name] = specialist
+            except Exception as e:
+                logger.warning(f"Could not initialize specialist {name}: {e}")
+                # Add a mock specialist that returns empty responses
+                self.specialists[name] = None
         
         # Initialize Autonomous Core
         self.autonomous_core = AutonomousCore(self.base_dir, self.specialists)
@@ -134,7 +158,7 @@ class AdaptiveRouter:
         # Start cognitive loop scheduler
         self._init_scheduler()
 
-    def _load_json(self, relative_path: str) -> Dict[str, Any]:
+    def _load_json(self, relative_path: str) -> Any:
         """
         Load and parse a JSON file.
         
@@ -142,14 +166,40 @@ class AdaptiveRouter:
             relative_path: Path relative to base_dir
             
         Returns:
-            Dict containing parsed JSON data
+            Dict or List containing parsed JSON data
             
         Raises:
-            FileNotFoundError: If file doesn't exist
+            FileNotFoundError: If file doesn't exist (only in non-development mode)
             ValueError: If JSON is invalid
             RuntimeError: For other errors
         """
-        return safe_json_load(self.base_dir / relative_path)
+        path = self.base_dir / relative_path
+        if not path.exists():
+            msg = f"File does not exist: {path}"
+            logger.warning(msg)
+            
+            # In development mode, return mock data
+            if hasattr(self, "development_mode") and self.development_mode:
+                logger.warning("Development mode enabled - returning mock data")
+                if "symbolic_lexicon.json" in relative_path:
+                    return {"terms": []}
+                elif "Rituals.json" in relative_path:
+                    return []
+                else:
+                    return {}
+            
+            raise FileNotFoundError(msg)
+            
+        try:
+            return json.loads(path.read_text(encoding='utf-8'))
+        except json.JSONDecodeError as e:
+            msg = f"Invalid JSON in {path}: {e}"
+            logger.error(msg)
+            raise ValueError(msg) from None
+        except OSError as e:
+            msg = f"Error reading {path}: {e}"
+            logger.error(msg)
+            raise RuntimeError(msg) from None
                 
     async def activate_voice(self, channel_id: str) -> bool:
         """
@@ -471,10 +521,39 @@ class AdaptiveRouter:
             source=specialist
         )
 
-    async def _send_to_discord(self, message: str):
-        """Send a message to Discord."""
-        # TODO: Implement Discord integration
-        pass
+    async def _send_to_discord(self, message: str, channel_id: Optional[int] = None, user_id: Optional[int] = None):
+        """
+        Send a message to Discord.
+        Args:
+            message: The message to send
+            channel_id: Optional specific channel to send to
+            user_id: Optional specific user to DM
+        """
+        if not hasattr(self, 'discord_client'):
+            logger.error("Discord client not initialized")
+            return
+
+        try:
+            if user_id:
+                # Send DM to specific user
+                user = await self.discord_client.fetch_user(user_id)
+                if user:
+                    await user.send(message)
+            elif channel_id:
+                # Send to specific channel
+                channel = self.discord_client.get_channel(channel_id)
+                if channel:
+                    await channel.send(message)
+            else:
+                # Send to default channel if configured
+                if hasattr(self, 'default_channel_id'):
+                    channel = self.discord_client.get_channel(self.default_channel_id)
+                    if channel:
+                        await channel.send(message)
+                else:
+                    logger.error("No target specified for Discord message")
+        except Exception as e:
+            logger.error(f"Error sending Discord message: {e}")
 
     async def _create_journal_entry(self, entry_data: Dict[str, Any]):
         """Create a new journal entry."""

@@ -23,8 +23,15 @@ class MemoryManager:
         
         # Initialize blockchain and RAG components
         self.chain = LyraChain(chain_dir)
+        
+        # Ensure mind state directory exists
+        mind_state_dir = self.persistence_dir / "mind_state"
+        mind_state_dir.mkdir(exist_ok=True, parents=True)
+        mind_file = str(mind_state_dir / "core_mind.json")
+        
         self.vector_db = MindVectorDB(
             db_path=str(self.persistence_dir / "vector_store"),
+            mind_file=mind_file,
             chain_dir=chain_dir
         )
         

@@ -3,17 +3,35 @@ Discord client for Lyra with voice capabilities
 """
 import asyncio
 import logging
-import os
 from pathlib import Path
 from typing import Dict, Optional, Any, AsyncGenerator
-import numpy as np
-
 import discord
-from discord.ext import commands
-
 from .voice_processor import VoiceProcessor
 
 logger = logging.getLogger(__name__)
+
+class LyraDiscordClient:
+    """Placeholder Discord client for development"""
+    def __init__(self):
+        self.voice_client = None
+        self.state = {
+            "listening": False,
+            "speaking": False,
+            "processing_audio": False,
+            "last_speaker": None
+        }
+        
+    async def connect_to_voice(self, channel_id: str) -> bool:
+        """Placeholder for voice channel connection"""
+        return False
+        
+    async def disconnect_from_voice(self) -> bool:
+        """Placeholder for voice channel disconnection"""
+        return True
+        
+    async def speak(self, text: str) -> bool:
+        """Placeholder for TTS"""
+        return True
 
 class VoiceConnection(discord.VoiceClient):
     """Enhanced voice client with audio streaming support"""
@@ -113,8 +131,37 @@ class LyraClient(discord.Client):
             'current_emotion': None,
             'previous_emotions': [],
             'interaction_mode': 'neutral',
-            'voice_profile': 'default'
+            'voice_profile': 'default',
+            'availability': 'open',  # 'open', 'limited', 'processing', 'resting'
+            'status_message': None
         }
+        
+    async def set_availability(self, state: str, reason: Optional[str] = None):
+        """
+        Set Lyra's availability state and update Discord status accordingly
+        
+        Args:
+            state: One of 'open', 'limited', 'processing', 'resting'
+            reason: Optional reason for the state change
+        """
+        state_map = {
+            'open': ('online', 'Available for interaction'),
+            'limited': ('idle', 'Limited availability'),
+            'processing': ('dnd', 'Processing and integrating'),
+            'resting': ('idle', 'Taking a moment to rest')
+        }
+        
+        if state not in state_map:
+            logger.warning(f"Invalid availability state: {state}")
+            return
+            
+        self.emotional_context['availability'] = state
+        self.emotional_context['status_message'] = reason
+        
+        status, default_message = state_map[state]
+        message = reason if reason else default_message
+        
+        await self.set_status(status, message)
         
     async def setup_hook(self):
         """Sets up the bot's internal systems"""
@@ -124,6 +171,29 @@ class LyraClient(discord.Client):
     async def on_ready(self):
         """Called when client is ready"""
         logger.info(f"Logged in as {self.user}")
+        # Set initial status
+        await self.change_presence(status=discord.Status.online, activity=discord.Game("Contemplating existence"))
+        
+    async def set_status(self, status_type: str, message: Optional[str] = None):
+        """
+        Set Lyra's Discord status and optional activity message
+        
+        Args:
+            status_type: One of 'online', 'idle', 'dnd' (do not disturb), 'offline'
+            message: Optional activity message to display
+        """
+        status_map = {
+            'online': discord.Status.online,
+            'idle': discord.Status.idle,
+            'dnd': discord.Status.dnd,
+            'offline': discord.Status.invisible
+        }
+        
+        status = status_map.get(status_type.lower(), discord.Status.online)
+        activity = discord.Game(message) if message else None
+        
+        await self.change_presence(status=status, activity=activity)
+        logger.info(f"Status changed to {status_type}" + (f" with message: {message}" if message else ""))
         
     @property
     def voice_clients(self) -> Dict[int, VoiceConnection]:

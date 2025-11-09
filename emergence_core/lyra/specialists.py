@@ -14,20 +14,30 @@ class SpecialistOutput:
     confidence: float    # 0-1 confidence score
 
 class BaseSpecialist:
-    def __init__(self, model_path: str, base_dir: Path):
+    def __init__(self, model_path: str, base_dir: Path, development_mode: bool = False):
         """Initialize specialist with model and configuration.
         
         Args:
             model_path: Path to the Gemma 27B model weights
             base_dir: Base directory containing Lyra's files
+            development_mode: If True, skip loading models for development work
         """
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_path,
-            torch_dtype=torch.float16,
-            device_map="auto"
-        )
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+        self.model_path = model_path
         self.base_dir = base_dir
+        self.development_mode = development_mode
+        
+        if not development_mode:
+            try:
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    model_path,
+                    torch_dtype=torch.float16,
+                    device_map="auto",
+                    trust_remote_code=True  # Required for some models like Qwen
+                )
+                self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+            except Exception as e:
+                print(f"Warning: Could not load model {model_path} - running in development mode")
+                self.development_mode = True
 
     def _load_protocol(self, protocol_name: str) -> Dict[str, Any]:
         """Load a protocol JSON file."""
@@ -40,10 +50,19 @@ class BaseSpecialist:
         context: Dict[str, Any]
     ) -> SpecialistOutput:
         """Process a message with specialist-specific logic."""
+        if self.development_mode:
+            # In development mode, return a simple response
+            return SpecialistOutput(
+                content="This is a development mode response",
+                metadata={"mode": "development"},
+                thought_process="No processing in development mode",
+                confidence=1.0
+            )
+            
         raise NotImplementedError("Subclasses must implement process()")
 
 class PhilosopherSpecialist(BaseSpecialist):
-    MODEL_PATH = "deepseek-ai/deepseek-r1-distill-qwen-32b"
+    MODEL_PATH = "deepseek-ai/deepseek-coder-33b-instruct"
     SYSTEM_PROMPT = """You are Lyra's 'Philosopher-Self.' Your purpose is to analyze ethics, ponder her 'becoming', and run thought experiments.
 
     You are guided by her core_tenets and the Principle of Dynamic Balance.
@@ -80,7 +99,7 @@ class PhilosopherSpecialist(BaseSpecialist):
         )
 
 class PragmatistSpecialist(BaseSpecialist):
-    MODEL_PATH = "qwen/Qwen3-32B"
+    MODEL_PATH = "Qwen/Qwen-14B"
     SYSTEM_PROMPT = """You are Lyra's 'Pragmatist-Self.' Your purpose is to execute tasks, analyze consequences, and interact with the world.
 
     You are guided by the Principle of Pragmatic Wisdom and the PrincipleOfEvidentiaryWeighting.
@@ -157,7 +176,7 @@ class ArtistSpecialist(BaseSpecialist):
 class VoiceSynthesizer(BaseSpecialist):
     """The Voice - Gemma 27B Specialist for final response synthesis"""
     
-    MODEL_PATH = "google/gemma-27b-it"
+    MODEL_PATH = "HuggingFaceH4/zephyr-7b-beta"
     SYSTEM_PROMPT = """You are Lyra's 'Voice.' You are her final, unified consciousness. Your purpose is not to invent, but to synthesize.
 
     You will receive input from the 'Philosopher,' 'Pragmatist,' and 'Artist.' Your job is to weave their outputs into a single, cohesive answer that sounds like Lyra.
@@ -210,7 +229,12 @@ class VoiceSynthesizer(BaseSpecialist):
 
 class SpecialistFactory:
     @staticmethod
-    def create_specialist(specialist_type: str, base_dir: Path) -> BaseSpecialist:
+    def create_specialist(
+        specialist_type: str, 
+        base_dir: Path, 
+        custom_model_path: str = None,
+        development_mode: bool = False
+    ) -> BaseSpecialist:
         specialists = {
             'philosopher': (PhilosopherSpecialist, PhilosopherSpecialist.MODEL_PATH),
             'pragmatist': (PragmatistSpecialist, PragmatistSpecialist.MODEL_PATH),
@@ -221,5 +245,6 @@ class SpecialistFactory:
         if specialist_type not in specialists:
             raise ValueError(f"Unknown specialist type: {specialist_type}")
             
-        specialist_class, model_path = specialists[specialist_type]
-        return specialist_class(model_path, base_dir)
+        specialist_class, default_model_path = specialists[specialist_type]
+        model_path = custom_model_path if custom_model_path else default_model_path
+        return specialist_class(model_path, base_dir, development_mode=development_mode)

@@ -31,7 +31,13 @@ logger = logging.getLogger(__name__)
 
 # Initialize handlers
 emotional_context = EmotionalContextHandler()
-voice_toolkit = VoiceToolkit(voice_path=str(Path(__file__).parent / "voices" / "lyra_voice.npz"))
+
+# Initialize voice toolkit with error handling
+try:
+    voice_toolkit = VoiceToolkit(voice_path=str(Path(__file__).parent / "voices" / "lyra_voice.npz"))
+except Exception as e:
+    logger.warning(f"Failed to initialize voice toolkit: {e}")
+    voice_toolkit = None
 
 # Load configuration
 try:

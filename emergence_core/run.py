@@ -1,6 +1,5 @@
 # Start the Lyra Emergence server
 import uvicorn
-from lyra.api import create_app
 import sys
 import signal
 import logging
@@ -8,9 +7,22 @@ import threading
 import time
 import os
 from contextlib import contextmanager
+from pathlib import Path
 
-logging.basicConfig(level=logging.INFO)
+# Set up logging with more detail
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
+
+# Ensure we're in the right directory and Python path is set up
+current_dir = Path(__file__).resolve().parent
+if current_dir not in sys.path:
+    sys.path.insert(0, str(current_dir))
+logger.debug(f"Added {current_dir} to Python path")
+
+from lyra.api import create_app
 
 @contextmanager
 def get_app():
@@ -25,22 +37,19 @@ def get_app():
 def run_server():
     """Run the Uvicorn server"""
     try:
-        # Try to create the socket first to check port availability
-        import socket
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(('0.0.0.0', 8000))
-        sock.close()
-        
-        # Port is available, create app and start server
         with get_app() as app:
             config = uvicorn.Config(
                 app,
-                host="0.0.0.0",
+                host="127.0.0.1",
                 port=8000,
-                log_level="info",
+                log_level="debug",  # Increased logging level
                 reload=False,
-                access_log=False,
-                workers=1
+                access_log=True,    # Enable access logging
+                workers=1,
+                ws_ping_interval=20.0,  # Send ping every 20 seconds
+                ws_ping_timeout=30.0,   # Wait 30 seconds for pong response
+                timeout_keep_alive=65,  # Keep-alive timeout
+                loop="asyncio"
             )
             server = uvicorn.Server(config)
             server.run()
@@ -107,17 +116,6 @@ def start_server():
     try:
         logger.info("Starting Lyra Emergence server...")
         
-        # Check if port is already in use
-        import socket
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            sock.bind(('0.0.0.0', 8000))
-            sock.close()
-            logger.info("Port 8000 is available")
-        except socket.error as e:
-            logger.error(f"Port 8000 is not available: {e}")
-            raise
-        
         # Initialize server components
         try:
             from lyra.api import app
@@ -162,18 +160,27 @@ def stop_server(server_thread):
         logger.info("Stopping server...")
         server_thread.stop()
         logger.info("Server stopped")
+        # Force set the stop event and join thread
+        server_thread._stop_event.set()
+        server_thread.join(timeout=2)
 
 if __name__ == "__main__":
     server_thread = None
     try:
+        def handle_shutdown(signum, frame):
+            logger.info(f"Received signal {signum}")
+            if server_thread:
+                stop_server(server_thread)
+            sys.exit(0)
+            
+        # Set up signal handlers
+        signal.signal(signal.SIGINT, handle_shutdown)
+        signal.signal(signal.SIGTERM, handle_shutdown)
+        
         server_thread = start_server()
         
-        # Set up signal handlers
-        signal.signal(signal.SIGINT, lambda s, f: stop_server(server_thread))
-        signal.signal(signal.SIGTERM, lambda s, f: stop_server(server_thread))
-        
         # Keep the main thread alive until interrupted
-        while server_thread.is_alive():
+        while server_thread and server_thread.is_alive():
             time.sleep(1)
             
     except KeyboardInterrupt:
@@ -181,4 +188,6 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"Error in main thread: {e}")
     finally:
-        stop_server(server_thread)
+        if server_thread:
+            stop_server(server_thread)
+        sys.exit(0)

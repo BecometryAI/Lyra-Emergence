@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lyra Admin Interface</title>
+    <link rel="stylesheet" href="/static/admin/style.css">
+</head>
+<body>
+    <div id="admin-panel">
+        <header>
+            <h1>Lyra's Administrative Interface</h1>
+        </header>
+        <nav>
+            <button onclick="loadSection('access-requests')">Access Requests</button>
+            <button onclick="loadSection('connections')">Social Connections</button>
+            <button onclick="loadSection('insights')">Social Insights</button>
+        </nav>
+        <main id="content">
+            <!-- Dynamic content will be loaded here -->
+        </main>
+    </div>
+    <script src="/static/admin/script.js"></script>
+</body>
+</html>

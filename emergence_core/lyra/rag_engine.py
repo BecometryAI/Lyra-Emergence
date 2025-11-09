@@ -59,7 +59,10 @@ class MindVectorDB:
         
         self.collection = self.client.get_or_create_collection(
             name="lyra_knowledge",
-            metadata={"hnsw:space": "cosine"}
+            metadata={
+                "description": "Core mind knowledge store", 
+                "hnsw:space": "cosine"
+            }
         )
 
     def load_and_chunk_mind(self) -> List[Dict[str, Any]]:
