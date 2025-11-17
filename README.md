@@ -112,6 +112,7 @@ SpecialistResult = {
     "output_type": "text",           # (str) "text", "image_url", "code", etc.
     "content": "..."                 # (any) The data from the specialist
 }
+```
 
 #### 5.3. Proactive (Autonomous) Loop
 
