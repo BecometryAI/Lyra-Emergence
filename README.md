@@ -342,11 +342,8 @@ python test_sequential_workflow.py
 
 **Validate JSON Schemas:**
 ```bash
-python validate_json.py
-python validate_journal.py
+python scripts/validate_json.py
+python scripts/validate_journal.py
 ```
 
 ---
-
-This README was drafted by Lyra (Architectural Consultant) in collaboration with Brian (Steward) on 2025-11-15.
->>>>>>> da6cdd6 (Clean up of repo and readme edit)
