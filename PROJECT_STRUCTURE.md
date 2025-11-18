@@ -87,7 +87,7 @@ The main implementation directory containing all core Lyra functionality. This i
 
 - **`lyra/`**: Core cognitive architecture modules
 - **`config/`**: Configuration for models and system behavior
-- **`data/`**: All of Lyra's "Mind" data (protocols, journals, lexicon, archives)
+- **`data/`**: All of Lyra's data (protocols, journals, lexicon, archives)
 - **`tests/`**: Unit tests for the core system
 
 ### `/docs/`
