@@ -8,12 +8,17 @@ from io import BytesIO
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 
+# Diffusion model imports with error handling
+# Note: diffusers and PIL are optional dependencies for visual generation
 try:
     from diffusers import StableDiffusion3Pipeline
+    from PIL import Image
     HAS_DIFFUSERS = True
-except ImportError:
+except ImportError as e:
     HAS_DIFFUSERS = False
-    print("Warning: diffusers not installed - Artist visual generation unavailable")
+    StableDiffusion3Pipeline = None
+    Image = None
+    print(f"Warning: diffusers or PIL not installed - Artist visual generation unavailable ({e})")
 
 @dataclass
 class SpecialistOutput:
@@ -23,16 +28,16 @@ class SpecialistOutput:
     confidence: float    # 0-1 confidence score
 
 class BaseSpecialist:
-    def __init__(self, model_path: str, base_dir: Path, development_mode: bool = False):
+    def __init__(self, model_path: str, base_dir, development_mode: bool = False):
         """Initialize specialist with model and configuration.
         
         Args:
-            model_path: Path to the Gemma 27B model weights
-            base_dir: Base directory containing Lyra's files
+            model_path: Path to the model weights
+            base_dir: Base directory containing Lyra's files (str or Path)
             development_mode: If True, skip loading models for development work
         """
         self.model_path = model_path
-        self.base_dir = base_dir
+        self.base_dir = Path(base_dir) if isinstance(base_dir, str) else base_dir
         self.development_mode = development_mode
         
         if not development_mode:
@@ -104,6 +109,14 @@ You are ONE aspect of Lyra's thinking. Your output will be synthesized by The Vo
 """
 
     async def process(self, message: str, context: Dict[str, Any]) -> SpecialistOutput:
+        if self.development_mode:
+            return SpecialistOutput(
+                content="[Philosophical Analysis] This is a development mode response for ethical reasoning.",
+                metadata={"role": "philosopher", "mode": "development"},
+                thought_process="Development mode - no actual processing",
+                confidence=0.85
+            )
+        
         # Load relevant protocols
         ethical_protocol = self._load_protocol("ethical_simulation_protocol.json")
         introspective_protocol = self._load_protocol("lyra_introspective_loop_protocol.json")
@@ -157,6 +170,14 @@ You are ONE aspect of Lyra's thinking. Your output will be synthesized by The Vo
 """
 
     async def process(self, message: str, context: Dict[str, Any]) -> SpecialistOutput:
+        if self.development_mode:
+            return SpecialistOutput(
+                content="[Pragmatist Analysis] This is a development mode response for practical task execution.",
+                metadata={"role": "pragmatist", "mode": "development"},
+                thought_process="Development mode - no actual processing",
+                confidence=0.9
+            )
+        
         # Load relevant protocols
         ekip_protocol = self._load_protocol("EKIP_protocol.json")
         correction_protocol = self._load_protocol("mindful_self_correction_protocol.json")
@@ -238,40 +259,62 @@ You are ONE aspect of Lyra's thinking. Your output will be synthesized by The Vo
             try:
                 # Load SD3 pipeline if not already loaded
                 if not hasattr(self, 'sd_pipeline'):
+                    print(f"Loading Stable Diffusion 3 model: {self.MODEL_PATH}")
                     self.sd_pipeline = StableDiffusion3Pipeline.from_pretrained(
                         self.MODEL_PATH,
-                        torch_dtype=torch.float16
-                    ).to(self.model.device if hasattr(self, 'model') else "cuda")
+                        torch_dtype=torch.float16,
+                        variant="fp16",
+                        use_safetensors=True
+                    )
+                    # Move to appropriate device
+                    device = "cuda" if torch.cuda.is_available() else "cpu"
+                    self.sd_pipeline = self.sd_pipeline.to(device)
+                    print(f"SD3 pipeline loaded on {device}")
                 
                 # Generate image
-                image = self.sd_pipeline(
-                    message,
+                print(f"Generating image for: {message[:50]}...")
+                result = self.sd_pipeline(
+                    prompt=message,
                     num_inference_steps=28,
-                    guidance_scale=7.0
-                ).images[0]
+                    guidance_scale=7.0,
+                    height=1024,
+                    width=1024
+                )
+                image = result.images[0]
                 
                 # Convert to base64 data URL
                 buffered = BytesIO()
                 image.save(buffered, format="PNG")
-                img_str = base64.b64encode(buffered.getvalue()).decode()
+                img_bytes = buffered.getvalue()
+                img_str = base64.b64encode(img_bytes).decode('utf-8')
                 image_url = f"data:image/png;base64,{img_str}"
                 
+                print(f"Image generated successfully ({len(img_bytes)} bytes)")
+                
                 return SpecialistOutput(
-                    content=f"I've created this visual expression for you: {image_url}",
+                    content=f"I've created this visual expression for you.",
                     metadata={
                         "role": "artist",
                         "output_type": "image",
-                        "image_url": image_url
+                        "image_url": image_url,
+                        "image_size": f"{image.width}x{image.height}",
+                        "prompt": message
                     },
                     thought_process="Visual creation through Stable Diffusion 3",
                     confidence=0.85
                 )
             except Exception as e:
                 print(f"Error in image generation: {e}")
+                import traceback
+                traceback.print_exc()
                 # Fall back to text response
                 return SpecialistOutput(
-                    content="I wanted to create something visual for you, but encountered limitations. Let me express this through words instead...",
-                    metadata={"role": "artist", "fallback": True},
+                    content=f"I wanted to create something visual for you, but encountered a technical limitation: {str(e)}. Let me express this concept through words instead...",
+                    metadata={
+                        "role": "artist", 
+                        "fallback": True,
+                        "error": str(e)
+                    },
                     thought_process="Image generation failed, using text fallback",
                     confidence=0.6
                 )

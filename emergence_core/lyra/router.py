@@ -299,7 +299,7 @@ class AdaptiveRouter:
             context = {}
             
         # STEP 1: Router classification with Gemma 12B
-        router_response = self.router_model.analyze_message(message, self.active_lexicon_terms)
+        router_response = await self.router_model.analyze_message(message, self.active_lexicon_terms)
         
         # Determine which specialist to use (lowercase for dict lookup)
         specialist_type = router_response.intent.lower()

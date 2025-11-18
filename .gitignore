@@ -92,6 +92,14 @@ model_cache/
 memories/
 .memories/
 
+# Test output and temporary files
+test_chain/
+test_memories/
+test_meta_logs/
+test_output/
+*.html
+searxng_response.html
+
 # Large binary files and models
 *.bin
 *.h5
@@ -107,6 +115,7 @@ memories/
 # Runtime files
 *.pid
 server.pid
+*.log
 
 # Environment variables
 .env
