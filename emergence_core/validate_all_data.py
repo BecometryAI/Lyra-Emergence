@@ -478,7 +478,10 @@ class DataValidator:
         
         logger.info("=" * 70)
         logger.info(f"Total files:        {total_files}")
-        logger.info(f"Valid files:        {total_valid} ({total_valid/total_files*100:.1f}%)")
+        if total_files > 0:
+            logger.info(f"Valid files:        {total_valid} ({total_valid/total_files*100:.1f}%)")
+        else:
+            logger.info(f"Valid files:        {total_valid} (0.0%)")
         logger.info(f"Invalid files:      {total_invalid}")
         logger.info(f"Journal entries:    {self.stats.valid_journal_entries} valid, "
                    f"{self.stats.invalid_journal_entries} invalid")
@@ -497,7 +500,9 @@ class DataValidator:
             'total_files': total_files,
             'valid_files': total_valid,
             'invalid_files': total_invalid,
-            'stats': self.stats.to_dict()
+            'valid_journal_entries': self.stats.valid_journal_entries,
+            'invalid_journal_entries': self.stats.invalid_journal_entries,
+            'missing_trailing_newline': self.stats.missing_trailing_newline
         }
         
         return report
