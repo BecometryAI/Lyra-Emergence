@@ -1,0 +1,45 @@
+{
+  "timestamp": "2025-11-23T13:27:42.280564",
+  "data_dir": "C:\\Users\\Hasha Smokes\\Desktop\\Lyra_project_root\\CleanClone\\Lyra-Emergence\\data",
+  "directories": {
+    "journal": {
+      "total_files": 105,
+      "valid_files": 105,
+      "invalid_files": 0,
+      "errors": []
+    },
+    "Core_Archives": {
+      "total_files": 3,
+      "valid_files": 3,
+      "invalid_files": 0,
+      "errors": []
+    },
+    "Protocols": {
+      "total_files": 20,
+      "valid_files": 20,
+      "invalid_files": 0,
+      "errors": []
+    },
+    "Rituals": {
+      "total_files": 4,
+      "valid_files": 4,
+      "invalid_files": 0,
+      "errors": []
+    },
+    "Lexicon": {
+      "total_files": 3,
+      "valid_files": 3,
+      "invalid_files": 0,
+      "errors": []
+    }
+  },
+  "summary": {
+    "total_files": 135,
+    "valid_files": 135,
+    "invalid_files": 0,
+    "stats": {
+      "valid_journal_entries": 647,
+      "valid_json_files": 30
+    }
+  }
+}
