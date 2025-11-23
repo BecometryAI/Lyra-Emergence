@@ -146,12 +146,22 @@ class AdaptiveRouter:
         self.specialists = {}
         for name, model_path in specialist_configs.items():
             try:
-                specialist = self.specialist_factory.create_specialist(
-                    name, 
-                    str(self.base_dir),
-                    model_path,
-                    development_mode=True
-                )
+                # Pragmatist gets ChromaDB collection for RAG queries
+                if name == 'pragmatist':
+                    specialist = self.specialist_factory.create_specialist(
+                        name, 
+                        str(self.base_dir),
+                        model_path,
+                        development_mode=True,
+                        chroma_collection=self.collection
+                    )
+                else:
+                    specialist = self.specialist_factory.create_specialist(
+                        name, 
+                        str(self.base_dir),
+                        model_path,
+                        development_mode=True
+                    )
                 self.specialists[name] = specialist
             except Exception as e:
                 logger.warning(f"Could not initialize specialist {name}: {e}")

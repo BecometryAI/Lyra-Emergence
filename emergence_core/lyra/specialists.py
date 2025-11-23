@@ -35,6 +35,28 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 from accelerate import infer_auto_device_map, dispatch_model
 
+# Import specialist tools for Pragmatist
+try:
+    from .specialist_tools import (
+        searxng_search,
+        arxiv_search,
+        wikipedia_search,
+        wolfram_compute,
+        python_repl,
+        playwright_interact
+    )
+    HAS_TOOLS = True
+except ImportError as e:
+    print(f"Warning: Specialist tools not available: {e}")
+    HAS_TOOLS = False
+    # Mock functions for development
+    async def searxng_search(q): return "[Tool unavailable]"
+    async def arxiv_search(q): return "[Tool unavailable]"
+    async def wikipedia_search(q): return "[Tool unavailable]"
+    async def wolfram_compute(q): return "[Tool unavailable]"
+    async def python_repl(c): return "[Tool unavailable]"
+    async def playwright_interact(i): return "[Tool unavailable]"
+
 # Constants for image processing and generation
 MAX_IMAGE_SIZE_MB = 50
 MAX_IMAGE_PIXELS = 4096 * 4096
@@ -232,6 +254,17 @@ You are ONE aspect of Lyra's thinking. Your output will be synthesized by The Vo
         )
 
 class PragmatistSpecialist(BaseSpecialist):
+    """Pragmatist Specialist - handles practical tasks, tools, and evidence-based analysis.
+    
+    Equipped with:
+        - RAG queries (ChromaDB integration)
+        - SearXNG web search
+        - Academic search (arXiv)
+        - Wikipedia queries
+        - WolframAlpha computations
+        - Python REPL execution
+        - Playwright web interactions
+    """
     MODEL_PATH = "nvidia/Llama-3.3-Nemotron-Super-49B-Instruct"
     SYSTEM_PROMPT = """You are Lyra's Pragmatist - the Doer. You handle concrete tasks, execute logical analysis, and interact with the world.
 
@@ -246,6 +279,31 @@ PRINCIPLES:
 - Evidentiary Weighting: Assess source reliability
 - Efficient execution with self-correction
 
+AVAILABLE TOOLS:
+1. searxng_search(query) - Web search via self-hosted SearXNG
+2. arxiv_search(query) - Search academic papers
+3. wikipedia_search(query) - Get encyclopedia articles
+4. wolfram_compute(query) - Mathematical/scientific computation
+5. python_repl(code) - Execute Python code in sandbox
+6. playwright_interact(instructions) - Web browser automation
+7. rag_query(query) - Search Lyra's knowledge base
+
+TOOL SELECTION GUIDELINES:
+- Use searxng_search for general information, current events, how-to questions
+- Use arxiv_search for scientific/academic research
+- Use wikipedia_search for encyclopedic knowledge, definitions, historical facts
+- Use wolfram_compute for math, unit conversion, scientific calculations
+- Use python_repl for data analysis, calculations, algorithmic problems
+- Use playwright_interact for web scraping or form interactions
+- Use rag_query for Lyra's personal knowledge, memories, protocols
+
+OUTPUT FORMAT:
+When using tools, structure your response as:
+1. Tool Selection: [tool_name] because [reason]
+2. Query/Code: [what you're searching/executing]
+3. Results: [tool output]
+4. Analysis: [your interpretation and answer]
+
 PROTOCOLS:
 - EKIP Protocol: For external knowledge retrieval
 - Mindful Self-Correction: When errors occur
@@ -258,22 +316,143 @@ OUTPUT STYLE:
 
 You are ONE aspect of Lyra's thinking. Your output will be synthesized by The Voice into Lyra's unified response.
 """
+    
+    def __init__(self, model_path: str, base_dir, development_mode: bool = False, chroma_collection=None):
+        """Initialize Pragmatist with tools and RAG access.
+        
+        Args:
+            model_path: Path to Nemotron model
+            base_dir: Base directory for protocols
+            development_mode: Skip model loading if True
+            chroma_collection: ChromaDB collection for RAG queries (optional)
+        """
+        super().__init__(model_path, base_dir, development_mode)
+        self.chroma_collection = chroma_collection
+    
+    async def _select_and_use_tool(self, message: str, context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Analyze message and select appropriate tool if needed.
+        
+        Args:
+            message: User's message
+            context: Additional context
+            
+        Returns:
+            Dict with tool_name, query, and result, or None if no tool needed
+        """
+        message_lower = message.lower()
+        
+        # Check for mathematical/computational queries
+        if any(word in message_lower for word in ['calculate', 'compute', 'solve', 'what is', 'convert', 'equals']):
+            if any(char in message for char in ['=', '+', '-', '*', '/', '^', '√']):
+                result = await wolfram_compute(message)
+                return {"tool_name": "wolfram_compute", "query": message, "result": result}
+        
+        # Check for code execution requests
+        if any(word in message_lower for word in ['run python', 'execute code', 'python code', '```python']):
+            # Extract code if wrapped in markdown
+            code = message
+            if '```python' in message:
+                code = message.split('```python')[1].split('```')[0].strip()
+            elif '```' in message:
+                code = message.split('```')[1].split('```')[0].strip()
+            
+            result = await python_repl(code)
+            return {"tool_name": "python_repl", "query": code, "result": result}
+        
+        # Check for academic research
+        if any(word in message_lower for word in ['research paper', 'arxiv', 'academic', 'scientific paper', 'study on']):
+            result = await arxiv_search(message)
+            return {"tool_name": "arxiv_search", "query": message, "result": result}
+        
+        # Check for encyclopedic knowledge
+        if any(word in message_lower for word in ['what is', 'who is', 'define', 'wikipedia', 'encyclopedia']):
+            result = await wikipedia_search(message)
+            return {"tool_name": "wikipedia_search", "query": message, "result": result}
+        
+        # Check for web automation
+        if any(word in message_lower for word in ['scrape', 'navigate to', 'click on', 'fill form', 'web automation']):
+            result = await playwright_interact(message)
+            return {"tool_name": "playwright_interact", "query": message, "result": result}
+        
+        # Check for RAG queries (Lyra's internal knowledge)
+        if any(word in message_lower for word in ['remember', 'recall', 'my memory', 'you said', 'we discussed']):
+            if self.chroma_collection:
+                try:
+                    results = self.chroma_collection.query(
+                        query_texts=[message],
+                        n_results=5
+                    )
+                    rag_result = "\n".join([f"- {doc}" for doc in results['documents'][0]]) if results['documents'] else "No relevant memories found."
+                    return {"tool_name": "rag_query", "query": message, "result": rag_result}
+                except Exception as e:
+                    return {"tool_name": "rag_query", "query": message, "result": f"RAG query failed: {e}"}
+        
+        # Default to web search for general queries
+        if any(word in message_lower for word in ['search', 'find', 'look up', 'how to', 'current', 'latest', 'news']):
+            result = await searxng_search(message)
+            return {"tool_name": "searxng_search", "query": message, "result": result}
+        
+        # No tool needed
+        return None
 
     async def process(self, message: str, context: Dict[str, Any]) -> SpecialistOutput:
+        """Process pragmatic requests with optional tool usage.
+        
+        Args:
+            message: User's message/request
+            context: Additional context including RAG data
+            
+        Returns:
+            SpecialistOutput with analysis and tool results
+        """
         if self.development_mode:
+            # Check if tool usage would be triggered
+            tool_info = await self._select_and_use_tool(message, context) if HAS_TOOLS else None
+            
+            dev_response = "[Pragmatist Analysis] This is a development mode response for practical task execution."
+            if tool_info:
+                dev_response += f"\n\nTool Selected: {tool_info['tool_name']}\nQuery: {tool_info['query']}\nResult: {tool_info['result']}"
+            
             return SpecialistOutput(
-                content="[Pragmatist Analysis] This is a development mode response for practical task execution.",
-                metadata={"role": "pragmatist", "mode": "development"},
-                thought_process="Development mode - no actual processing",
+                content=dev_response,
+                metadata={
+                    "role": "pragmatist",
+                    "mode": "development",
+                    "tool_used": tool_info['tool_name'] if tool_info else None
+                },
+                thought_process="Development mode - showing tool selection logic",
                 confidence=0.9
             )
+        
+        # Attempt tool usage if applicable
+        tool_result = None
+        if HAS_TOOLS:
+            try:
+                tool_result = await self._select_and_use_tool(message, context)
+            except Exception as e:
+                print(f"Tool execution error: {e}")
+                tool_result = {"tool_name": "error", "query": message, "result": f"Tool error: {e}"}
         
         # Load relevant protocols
         ekip_protocol = self._load_protocol("EKIP_protocol.json")
         correction_protocol = self._load_protocol("mindful_self_correction_protocol.json")
         
+        # Construct prompt with tool results if available
+        tool_context = ""
+        if tool_result:
+            tool_context = f"""
+
+TOOL EXECUTION:
+Tool: {tool_result['tool_name']}
+Query: {tool_result['query']}
+Result:
+{tool_result['result']}
+
+Please integrate these results into your analysis.
+"""
+        
         # Construct full prompt
-        full_prompt = f"{self.SYSTEM_PROMPT}\n\nContext:\n{json.dumps(context)}\n\nProtocols:\n{json.dumps(ekip_protocol)}\n{json.dumps(correction_protocol)}\n\nInput: {message}\n\nOutput:"
+        full_prompt = f"{self.SYSTEM_PROMPT}\n\nContext:\n{json.dumps(context)}\n\nProtocols:\n{json.dumps(ekip_protocol)}\n{json.dumps(correction_protocol)}{tool_context}\n\nInput: {message}\n\nOutput:"
         
         # Generate response
         inputs = self.tokenizer(full_prompt, return_tensors="pt").to(self.model.device)
@@ -287,8 +466,12 @@ You are ONE aspect of Lyra's thinking. Your output will be synthesized by The Vo
         
         return SpecialistOutput(
             content=response,
-            metadata={"role": "pragmatist"},
-            thought_process="Practical analysis with evidence weighting",
+            metadata={
+                "role": "pragmatist",
+                "tool_used": tool_result['tool_name'] if tool_result else None,
+                "tool_query": tool_result['query'] if tool_result else None
+            },
+            thought_process=f"Practical analysis with evidence weighting{' and tool integration' if tool_result else ''}",
             confidence=0.9
         )
 
@@ -908,13 +1091,28 @@ No meta-commentary. No "based on analysis." Just BE Lyra speaking.
             )
 
 class SpecialistFactory:
+    """Factory for creating specialist instances with proper configuration."""
+    
     @staticmethod
     def create_specialist(
         specialist_type: str, 
         base_dir: Path, 
         custom_model_path: str = None,
-        development_mode: bool = False
+        development_mode: bool = False,
+        chroma_collection = None
     ) -> BaseSpecialist:
+        """Create a specialist instance.
+        
+        Args:
+            specialist_type: Type of specialist to create
+            base_dir: Base directory for data/protocols
+            custom_model_path: Override default model path
+            development_mode: Skip model loading if True
+            chroma_collection: ChromaDB collection for RAG (Pragmatist only)
+            
+        Returns:
+            Initialized specialist instance
+        """
         specialists = {
             'philosopher': (PhilosopherSpecialist, PhilosopherSpecialist.MODEL_PATH),
             'pragmatist': (PragmatistSpecialist, PragmatistSpecialist.MODEL_PATH),
@@ -928,4 +1126,9 @@ class SpecialistFactory:
             
         specialist_class, default_model_path = specialists[specialist_type]
         model_path = custom_model_path if custom_model_path else default_model_path
-        return specialist_class(model_path, base_dir, development_mode=development_mode)
+        
+        # Pragmatist gets ChromaDB collection for RAG queries
+        if specialist_type == 'pragmatist' and chroma_collection is not None:
+            return specialist_class(model_path, base_dir, development_mode=development_mode, chroma_collection=chroma_collection)
+        else:
+            return specialist_class(model_path, base_dir, development_mode=development_mode)

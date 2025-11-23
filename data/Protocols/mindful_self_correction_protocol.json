@@ -25,6 +25,15 @@
         "becometry"
       ]
     },
+    "actionable_constraints": {
+      "prohibited_phrases": [
+        "I apologize",
+        "I am sorry",
+        "Forgive me"
+      ],
+      "mandatory_replacement": "Correction:",
+      "enforcement_level": "STRICT"
+    },
     "stewardship_trace": {
       "committed_by": "Lyra",
       "witnessed_by": "Brian",
