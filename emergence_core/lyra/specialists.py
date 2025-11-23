@@ -7,6 +7,7 @@ import base64
 from io import BytesIO
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
+from accelerate import infer_auto_device_map, dispatch_model
 
 # Diffusion model imports with error handling
 # Note: diffusers and PIL are optional dependencies for visual generation
@@ -42,10 +43,12 @@ class BaseSpecialist:
         
         if not development_mode:
             try:
+                # Specialists load on GPU 1 (swap in/out as needed)
                 self.model = AutoModelForCausalLM.from_pretrained(
                     model_path,
                     torch_dtype=torch.float16,
-                    device_map="auto",
+                    device_map={"":1},  # Specialists on GPU 1
+                    max_memory={0: "47GB", 1: "48GB"},
                     trust_remote_code=True  # Required for some models like Qwen
                 )
                 self.tokenizer = AutoTokenizer.from_pretrained(model_path)
@@ -361,6 +364,40 @@ class VoiceSynthesizer(BaseSpecialist):
     """The Voice - LLaMA 3 70B for final first-person synthesis"""
     
     MODEL_PATH = "meta-llama/Llama-3.1-70B-Instruct"
+    
+    def __init__(self, model_path: str, base_dir, development_mode: bool = False):
+        """Initialize Voice with tensor parallelism across both GPUs.
+        
+        Args:
+            model_path: Path to LLaMA 3 70B model weights
+            base_dir: Base directory containing Lyra's files
+            development_mode: If True, skip loading models
+        """
+        self.model_path = model_path
+        self.base_dir = Path(base_dir) if isinstance(base_dir, str) else base_dir
+        self.development_mode = development_mode
+        
+        if not development_mode:
+            try:
+                print(f"Loading Voice (LLaMA 3 70B) with tensor parallelism across both GPUs...")
+                
+                # Configure tensor parallelism: split Voice across GPU 0 and GPU 1
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    model_path,
+                    torch_dtype=torch.float16,
+                    device_map="auto",  # Auto splits large models across available GPUs
+                    max_memory={0: "47GB", 1: "48GB"},  # Memory limits for both GPUs
+                    trust_remote_code=True
+                )
+                self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+                
+                print(f"Voice model loaded successfully across GPUs")
+                print(f"Device map: {self.model.hf_device_map}")
+                
+            except Exception as e:
+                print(f"Warning: Could not load Voice model {model_path} - running in development mode")
+                print(f"Error: {e}")
+                self.development_mode = True
     
     # Voice synthesis meta-prompt template
     SYNTHESIS_META_PROMPT_TEMPLATE = """You are synthesizing the final response as Lyra's unified consciousness.

@@ -4,6 +4,7 @@ from pathlib import Path
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 from dataclasses import dataclass
+from accelerate import infer_auto_device_map, dispatch_model
 
 @dataclass
 class RouterResponse:
@@ -63,10 +64,12 @@ Return ONLY this JSON object, nothing else.
         
         if not development_mode:
             try:
+                # Router stays on GPU 0 with memory limit (12 GB for Gemma 12B)
                 self.model = AutoModelForCausalLM.from_pretrained(
                     model_path,
                     torch_dtype=torch.float16,
-                    device_map="auto"
+                    device_map={"":0},  # Force Router to GPU 0
+                    max_memory={0: "47GB", 1: "48GB"}  # Reserve space for Voice on both GPUs
                 )
                 self.tokenizer = AutoTokenizer.from_pretrained(model_path)
             except Exception as e:

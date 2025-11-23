@@ -41,6 +41,9 @@ schedule>=1.2.0
 pytest>=8.4.2
 pytest-asyncio>=1.2.0
 
+# GPU monitoring (optional)
+nvidia-ml-py>=12.560.30  # For NVLink detection and GPU monitoring
+
 # Utilities
 python-dotenv>=1.2.1
 pydantic>=2.12.4
