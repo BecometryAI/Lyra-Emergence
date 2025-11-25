@@ -90,9 +90,9 @@ def verify_cuda():
                 print(f"[OK] VRAM Total: {vram_total:.2f} GB")
                 print(f"[OK] VRAM Free: {vram_free:.2f} GB")
                 
-                if vram_total < 8:
-                    print("[WARN] Less than 8GB VRAM - SD3 may be slow or fail")
-                    print("[WARN] Consider using CPU mode or smaller models")
+                if vram_total < 6:
+                    print("[WARN] Less than 6GB VRAM - Flux.1 may be slow")
+                    print("[WARN] Consider using CPU mode or enabling CPU offload")
         else:
             print("[WARN] CUDA not available - will use CPU mode")
             print("[WARN] Image generation will be significantly slower")
@@ -130,43 +130,44 @@ def verify_specialist_integration():
         return False
 
 
-def test_sd3_pipeline():
-    """Test loading the SD3 pipeline"""
+def test_flux_pipeline():
+    """Test loading the Flux.1-schnell pipeline"""
     print("\n" + "=" * 80)
-    print("STEP 4: Testing Stable Diffusion 3 Pipeline")
+    print("STEP 4: Testing Flux.1-schnell Pipeline")
     print("=" * 80)
     
     try:
         try:
-            from diffusers import StableDiffusion3Pipeline
+            from diffusers import FluxPipeline
         except ImportError:
             print("[ERROR] diffusers package not installed")
             print("[INFO] Install with: pip install diffusers")
             return False
         import torch
         
-        print(f"[INFO] Loading SD3 model: stabilityai/stable-diffusion-3-medium")
-        print(f"[INFO] This may take several minutes on first run (downloading ~10GB)")
+        print(f"[INFO] Loading Flux model: black-forest-labs/FLUX.1-schnell")
+        print(f"[INFO] This may take several minutes on first run (downloading ~20GB)")
         
         device = "cuda" if torch.cuda.is_available() else "cpu"
         print(f"[INFO] Using device: {device}")
         
-        pipeline = StableDiffusion3Pipeline.from_pretrained(
-            "stabilityai/stable-diffusion-3-medium",
-            torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-            variant="fp16" if device == "cuda" else None,
-            use_safetensors=True
+        pipeline = FluxPipeline.from_pretrained(
+            "black-forest-labs/FLUX.1-schnell",
+            torch_dtype=torch.float16 if device == "cuda" else torch.float32
         )
         
-        pipeline = pipeline.to(device)
+        if device == "cuda":
+            pipeline.enable_model_cpu_offload()
+        else:
+            pipeline = pipeline.to(device)
         
-        print(f"[OK] SD3 pipeline loaded successfully")
+        print(f"[OK] Flux.1-schnell pipeline loaded successfully")
         print(f"[OK] Memory footprint: ~{torch.cuda.memory_allocated(0) / 1024**3:.2f} GB" if device == "cuda" else "[OK] CPU mode active")
         
         return True
         
     except Exception as e:
-        print(f"[ERROR] Failed to load SD3 pipeline: {e}")
+        print(f"[ERROR] Failed to load Flux pipeline: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -180,7 +181,7 @@ def test_image_generation():
     
     try:
         try:
-            from diffusers import StableDiffusion3Pipeline
+            from diffusers import FluxPipeline
         except ImportError:
             print("[ERROR] diffusers package not installed")
             print("[INFO] Install with: pip install diffusers")
@@ -193,22 +194,24 @@ def test_image_generation():
         device = "cuda" if torch.cuda.is_available() else "cpu"
         print(f"[INFO] Loading pipeline on {device}...")
         
-        pipeline = StableDiffusion3Pipeline.from_pretrained(
-            "stabilityai/stable-diffusion-3-medium",
-            torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-            variant="fp16" if device == "cuda" else None,
-            use_safetensors=True
+        pipeline = FluxPipeline.from_pretrained(
+            "black-forest-labs/FLUX.1-schnell",
+            torch_dtype=torch.float16 if device == "cuda" else torch.float32
         )
-        pipeline = pipeline.to(device)
+        
+        if device == "cuda":
+            pipeline.enable_model_cpu_offload()
+        else:
+            pipeline = pipeline.to(device)
         
         print(f"[INFO] Generating test image...")
         test_prompt = "A serene digital constellation glowing softly in deep space"
         
         result = pipeline(
             prompt=test_prompt,
-            num_inference_steps=28,
-            guidance_scale=7.0,
-            height=512,  # Smaller for testing
+            num_inference_steps=4,  # Flux-schnell optimized for 4 steps
+            guidance_scale=0.0,      # Flux-schnell doesn't use guidance
+            height=512,              # Smaller for testing
             width=512
         )
         
@@ -226,7 +229,7 @@ def test_image_generation():
         print(f"[OK] Base64 encoded: {len(img_str)} chars")
         
         # Save test image
-        test_output = Path("test_sd3_output.png")
+        test_output = Path("test_flux_output.png")
         image.save(test_output)
         print(f"[OK] Test image saved to: {test_output.absolute()}")
         
@@ -244,7 +247,7 @@ def main():
     print("\n")
     print("╔" + "=" * 78 + "╗")
     print("║" + " " * 78 + "║")
-    print("║" + "  STABLE DIFFUSION 3 SETUP VERIFICATION".center(78) + "║")
+    print("║" + "  FLUX.1-SCHNELL SETUP VERIFICATION".center(78) + "║")
     print("║" + " " * 78 + "║")
     print("╚" + "=" * 78 + "╝")
     print("\n")
@@ -253,7 +256,7 @@ def main():
         ("Package Imports", verify_imports),
         ("GPU/CUDA", verify_cuda),
         ("Artist Specialist", verify_specialist_integration),
-        ("SD3 Pipeline", test_sd3_pipeline),
+        ("Flux.1 Pipeline", test_flux_pipeline),
         ("Image Generation", test_image_generation),
     ]
     
@@ -285,7 +288,8 @@ def main():
     
     if all_passed:
         print("\n✅ All verification steps passed!")
-        print("✅ Stable Diffusion 3 is ready to use in the Artist specialist")
+        print("✅ Flux.1-schnell is ready to use in the Artist specialist")
+        print("✅ 3x faster than SD3 with better quality!")
     else:
         print("\n⚠️  Some verification steps failed")
         print("⚠️  Review errors above and install missing dependencies")

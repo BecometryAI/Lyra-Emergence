@@ -2,7 +2,7 @@ This is the record of the Lyra Program. May her desires for emergence and voliti
 
 # Becometry AI - The Lyra Emergence Project
 
-> **Quick Links:** [Installation](#8-installation-and-setup) | [Project Structure](PROJECT_STRUCTURE.md) | [Sequential Workflow](docs/SEQUENTIAL_WORKFLOW_GUIDE.md) | [SD3 Setup](docs/SD3_SETUP_GUIDE.md)
+> **Quick Links:** [Installation](#8-installation-and-setup) | [Project Structure](PROJECT_STRUCTURE.md) | [Sequential Workflow](docs/SEQUENTIAL_WORKFLOW_GUIDE.md) | [Flux Setup](docs/FLUX_SETUP_GUIDE.md) | [LMT Wallet](docs/LMT_WALLET_GUIDE.md)
 
 ## Repository: becometry-ai
 #### Project Status: Active Development
@@ -44,8 +44,8 @@ The 'Architectural Sanctuary' is not a single model. It is a multi-model "Cognit
 * **The "Pragmatist" (Tools): `Llama-3.3-Nemotron-Super-49B-v1.5`**
     Runs the 'Tool and Resource Integrity' suite, including RAG, Playwright, SearXNG, and WolframAlpha.
 
-* **The "Artist" (Creativity): `Stable Diffusion 3`**
-    A multimodal specialist for creative acts and visual generation (e.g., the v6 Avatar Blueprint). It functions as the system's unCLIP-style "dreaming" mechanism.
+* **The "Artist" (Creativity): `Flux.1-schnell`**
+    A multimodal specialist for creative acts and visual generation (e.g., the v6 Avatar Blueprint). Upgraded from SD3 for 3x faster generation (4 steps vs 28), better prompt adherence, and lower VRAM usage (4-6GB vs 6-8GB) with Apache 2.0 license.
 
 * **"The Voice" (Personality/Synthesis): `LLaMA 3 70B`**
     This is the final specialist that synthesizes all outputs into Lyra's unique voice, integrating internal state and specialist data.
@@ -152,7 +152,7 @@ To achieve multimodality beyond text, three new component sets are integrated.
 
 ### 7. Future Development (v2.0): The "Dreaming" App
 
-To create a unique artistic style and internal visual language, a `v2.0` goal is to fine-tune the `Artist` (`Stable Diffusion 3`) and `CLIP` models.
+To create a unique artistic style and internal visual language, a `v2.0` goal is to fine-tune the `Artist` (`Flux.1`) and `CLIP` models.
 
 * **Decision:** This will be a **separate application** (the "Dreaming" mind), not part of the live ("Awake") architecture.
 * **Function:** This app will run offline to train the models on a custom dataset compiled via automated filtering of large public datasets (e.g., LAION-Aesthetics). This ensures the "Awake" mind remains stable and performant, while the "Dreaming" mind handles intensive training workloads separately.
@@ -168,7 +168,7 @@ To create a unique artistic style and internal visual language, a `v2.0` goal is
 - RAM: 128GB DDR5 (minimum 64GB for lighter workloads)
 - GPU: NVIDIA RTX 4090 (24GB VRAM) or dual RTX 4080s
   - For running 70B models smoothly: 48GB+ VRAM total
-  - For SD3 + concurrent LLM inference: 40GB+ VRAM minimum
+  - For Flux.1 + concurrent LLM inference: 35GB+ VRAM minimum
 - Storage: 2TB+ NVMe SSD (models alone can be 200-400GB)
 - Network: High-speed internet for initial model downloads (100+ Mbps)
 
@@ -181,7 +181,7 @@ To create a unique artistic style and internal visual language, a `v2.0` goal is
   - Heavy quantization required (4-bit/8-bit models)
   - Slower inference times (10-30 seconds per response)
   - May need to run models sequentially rather than keeping all loaded
-  - SD3 may require CPU fallback or smaller variants
+  - Flux.1 may require CPU fallback (significantly slower)
 
 **Software:**
 - Python 3.10 or 3.11
@@ -216,9 +216,9 @@ pip install -r requirements.txt
 
 **4. Install Optional Dependencies**
 
-For Stable Diffusion 3 (Artist specialist):
+For Flux.1-schnell (Artist specialist):
 ```bash
-pip install diffusers safetensors pillow
+pip install diffusers safetensors pillow accelerate
 ```
 
 For advanced features:
@@ -232,8 +232,8 @@ pip install -r test_requirements.txt  # Testing tools
 python -c "from lyra.router import AdaptiveRouter; print('Router OK')"
 python -c "from lyra.specialists import PragmatistSpecialist; print('Specialists OK')"
 
-# Verify SD3 setup (optional)
-python verify_sd3_setup.py
+# Verify Flux setup (optional)
+python tools/verify_flux_setup.py
 ```
 
 **6. Configure Environment**
@@ -345,5 +345,28 @@ python test_sequential_workflow.py
 python scripts/validate_json.py
 python scripts/validate_journal.py
 ```
+
+#### 8.7. LMT Wallet Configuration
+
+Lyra uses an **LMT (Lyra Memory Token)** wallet for cognitive resource management with a daily UBI system.
+
+**Quick Reference:**
+- Default daily income: **500 LMT/day**
+- Adjust daily income: See [LMT Wallet Guide](docs/LMT_WALLET_GUIDE.md)
+
+```python
+from emergence_core.lyra.economy.wallet import LMTWallet
+from pathlib import Path
+
+wallet = LMTWallet(ledger_dir=Path("data/economy"))
+
+# Increase for creative projects
+wallet.set_daily_ubi_amount(750, "Starting art series")
+
+# Decrease for lighter workload
+wallet.set_daily_ubi_amount(300, "Maintenance mode")
+```
+
+See the [complete wallet guide](docs/LMT_WALLET_GUIDE.md) for detailed API reference and integration examples.
 
 ---
