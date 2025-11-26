@@ -12,27 +12,27 @@ Usage Example:
     >>> from lyra.memory import MemoryManager
     >>> memory = MemoryManager(persistence_dir="memories", chain_dir="chain")
     >>> 
-    >>> # Load all existing journals, protocols, and lexicon
+    >>>  # Load all existing journals, protocols, and lexicon
     >>> results = memory.load_all_static_data(journal_limit=50)
     >>> print(f"Loaded {results['journals']} journal entries")
     >>> 
-    >>> # Store a new experience
+    >>>  # Store a new experience
     >>> memory.store_experience({
     ...     "description": "User asked about consciousness",
     ...     "response": "I explained my understanding...",
     ...     "emotional_tone": ["thoughtful", "engaged"]
     ... })
     >>> 
-    >>> # Retrieve relevant memories
+    >>>  # Retrieve relevant memories
     >>> memories = memory.retrieve_relevant_memories("What is Becometry?", k=5)
     >>> for mem in memories:
     ...     print(mem.get('description', mem.get('term')))
     >>> 
-    >>> # Use working memory for conversation context
+    >>>  # Use working memory for conversation context
     >>> memory.update_working_memory("current_topic", "consciousness", ttl_seconds=1800)
     >>> context = memory.get_working_memory_context(max_items=10)
     >>> 
-    >>> # Get system statistics
+    >>>  # Get system statistics
     >>> stats = memory.get_memory_stats()
     >>> print(f"Total memories: {stats['total_memories']}")
 
