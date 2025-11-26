@@ -135,8 +135,8 @@ python test_sequential_workflow.py
 - [Project Structure](../../PROJECT_STRUCTURE.md)
 - [Sequential Workflow Guide](../../docs/SEQUENTIAL_WORKFLOW_GUIDE.md)
 - [Memory Integration Guide](../../MEMORY_INTEGRATION_GUIDE.md)
-- [Build and Test Commands](.codex/implementation/BUILD_AND_TEST.md)
-- [Codex Workflow](.codex/instructions/CODEX_WORKFLOW.md)
+- [Build and Test Commands](BUILD_AND_TEST.md)
+- [Codex Workflow](../instructions/CODEX_WORKFLOW.md)
 
 ## Getting Started
 
