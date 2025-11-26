@@ -16,7 +16,7 @@ This guide provides practices for contributors to the Lyra-Emergence project, wh
 ---
 
 ## Development Basics
-- **Environment Setup**: Python 3.10 or 3.11 with virtual environment. See [Installation and Setup](README.md#8-installation-and-setup) in README.md.
+- **Environment Setup**: Python 3.10 or 3.11 with virtual environment. See [Installation and Setup](README.md#installation-and-setup) in README.md.
 - **Testing**: Run tests with `pytest emergence_core/tests/` from the project root. Ensure all tests pass before submitting changes.
 - **Code Style**: Follow Python PEP 8 conventions. Use meaningful variable names and add docstrings for public functions.
 - **Dependencies**: Install core dependencies with `pip install -r emergence_core/requirements.txt`. Document any new dependencies in `.codex/implementation/`.
