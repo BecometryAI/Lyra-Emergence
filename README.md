@@ -381,11 +381,13 @@ uv run pytest tests/
 
 **Test Sequential Workflow:**
 ```bash
+# Run from project root
 uv run python tests/test_sequential_workflow.py
 ```
 
 **Validate JSON Schemas:**
 ```bash
+# Run from project root
 uv run python scripts/validate_json.py
 uv run python scripts/validate_journal.py
 ```
