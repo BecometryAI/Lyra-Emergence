@@ -1,3 +1,5 @@
+# TODO: Major move to uv, make sure all of this is in the roots `./pyproject.toml` then remove this file
+
 # Core ML dependencies
 numpy>=2.3.4
 torch>=2.9.0
