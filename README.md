@@ -373,21 +373,20 @@ uv run run_discord_bot.py
 
 #### 8.6. Testing
 
+All testing commands should be run from the project root directory.
+
 **Run Test Suite:**
 ```bash
-cd emergence_core
-uv run pytest tests/
+uv run pytest emergence_core/tests/
 ```
 
 **Test Sequential Workflow:**
 ```bash
-# Run from project root
 uv run python tests/test_sequential_workflow.py
 ```
 
 **Validate JSON Schemas:**
 ```bash
-# Run from project root
 uv run python scripts/validate_json.py
 uv run python scripts/validate_journal.py
 ```
