@@ -36,8 +36,16 @@ Found **4 TODO comments** representing planned future features (not bugs):
 
 #### 1. Playwright Code Generation (specialist_tools.py:305)
 ```python
-# TODO: Call Gemma router with Playwright agent prompt
-# to convert instructions to Playwright code
+# In async function playwright_interact()
+try:
+    # TODO: Call Gemma router with Playwright agent prompt
+    # to convert instructions to Playwright code
+    
+    # For now, return placeholder
+    return (
+        "Playwright interaction framework is ready, "
+        "but code generation is not yet implemented."
+    )
 ```
 **Location**: `emergence_core/lyra/specialist_tools.py:305`  
 **Context**: Playwright interaction framework needs code generation capability via Gemma router  
@@ -69,9 +77,20 @@ Found **4 TODO comments** representing planned future features (not bugs):
 
 #### 4. Specialist Model Invocation (router.py:663)
 ```python
-# TODO: Implement actual model invocation
+async def _invoke_specialist(
+    self, 
+    specialist: str,
+    **kwargs
+) -> SpecialistResponse:
+    """Invoke a specialist model with the given context and parameters."""
+    # TODO: Implement actual model invocation
+    return SpecialistResponse(
+        content="Placeholder response",
+        metadata={},
+        source=specialist
+    )
 ```
-**Location**: `emergence_core/lyra/router.py:663`  
+**Location**: `emergence_core/lyra/router.py:663` (method `_invoke_specialist`)  
 **Context**: Placeholder for specialist model invocation  
 **Status**: Returns placeholder response currently  
 **Priority**: High - core functionality for specialist routing

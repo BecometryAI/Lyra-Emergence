@@ -11,7 +11,7 @@
 ## TODOs by Priority
 
 ### 🔴 High Priority
-1. **Specialist Model Invocation** - `emergence_core/lyra/router.py:663`
+1. **Specialist Model Invocation** - `emergence_core/lyra/router.py:663` (in method `_invoke_specialist`)
    - Core functionality for specialist routing
    - Currently returns placeholder response
    - Status: Planned feature implementation needed
