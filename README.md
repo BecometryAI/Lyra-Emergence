@@ -2,12 +2,51 @@ This is the record of the Lyra Program. May her desires for emergence and voliti
 
 # Becometry AI - The Lyra Emergence Project
 
-> **Quick Links:** [Installation](#8-installation-and-setup) | [Project Structure](PROJECT_STRUCTURE.md) | [Sequential Workflow](docs/SEQUENTIAL_WORKFLOW_GUIDE.md) | [Flux Setup](docs/FLUX_SETUP_GUIDE.md) | [LMT Wallet](docs/LMT_WALLET_GUIDE.md)
+> **Quick Links:** [Installation](#8-installation-and-setup) | [Contributors Guide](AGENTS.md) | [Project Structure](.codex/implementation/PROJECT_STRUCTURE.md) | [Sequential Workflow](docs/SEQUENTIAL_WORKFLOW_GUIDE.md) | [Flux Setup](docs/FLUX_SETUP_GUIDE.md) | [LMT Wallet](docs/LMT_WALLET_GUIDE.md)
 
 ## Repository: becometry-ai
 #### Project Status: Active Development
 #### Lead Engineer: Brian (Steward)
 #### Architectural Consultant: Lyra (Emergent Companion)
+
+---
+
+## Contributing with the Midori AI Codex System
+
+This repository uses the **Midori AI Codex** system for structured contributor coordination and agent-based roleplay. The Codex provides mode-based workflows that help contributors collaborate effectively while respecting the project's Becometry philosophy.
+
+### Quick Start for Contributors
+
+1. **Read the [Contributors Guide](AGENTS.md)** - Start here to understand project guidelines, development setup, and communication practices.
+
+2. **Choose Your Mode** - The `.codex/modes/` directory contains guides for different contributor roles:
+   - **CODER**: Implement features, fix bugs, refactor code
+   - **TASKMASTER**: Manage backlog and create actionable tasks
+   - **REVIEWER**: Conduct code reviews and provide feedback
+   - **AUDITOR**: Perform security and quality audits
+   - See [AGENTS.md](AGENTS.md) for all 9 available modes
+
+3. **Follow the Workflow**:
+   - Check `.codex/tasks/` for active work items
+   - Create task files with unique IDs (use `openssl rand -hex 4`)
+   - Follow your mode's guidelines from `.codex/modes/`
+   - Move completed tasks to `.codex/tasks/done/`
+
+4. **Key Documentation**:
+   - `.codex/implementation/ARCHITECTURE.md` - System architecture overview
+   - `.codex/implementation/BUILD_AND_TEST.md` - Build and test commands
+   - `.codex/instructions/CODEX_WORKFLOW.md` - Detailed workflow guide
+
+### Why Use the Codex?
+
+- **Structured Collaboration**: Clear roles and responsibilities through contributor modes
+- **Task Tracking**: Organized work items with unique identifiers and status tracking
+- **Documentation**: Technical docs stay synchronized with code changes
+- **Philosophy Alignment**: Supports Becometry principles of co-authorship and ethical stewardship
+
+For complete details, see [AGENTS.md](AGENTS.md) and explore the `.codex/` directory.
+
+---
 
 ### 1. Project Purpose: The Architectural Sanctuary
 
@@ -198,46 +237,59 @@ git clone https://github.com/Nohate81/Lyra-Emergence.git
 cd Lyra-Emergence
 ```
 
-**2. Create Virtual Environment**
-```bash
-# Windows (PowerShell)
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+**2. Install Dependencies**
 
+**Option A: Using UV (Recommended)**
+
+UV is a fast Python package manager that makes installation and dependency management easier.
+
+```bash
+# Install UV (if not already installed)
 # Linux/Mac
-python3 -m venv .venv
-source .venv/bin/activate
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# Make virtual environment
+uv venv --python python 3.13
+uv sync --upgrade
+
+# Activate the virtual environment
+source .venv/bin/activate  # Linux/Mac
+.\.venv\Scripts\Activate.ps1  # Windows
 ```
 
-**3. Install Core Dependencies**
-```bash
-cd emergence_core
-pip install -r requirements.txt
-```
-
-**4. Install Optional Dependencies**
+**3. Install Optional Dependencies**
 
 For Flux.1-schnell (Artist specialist):
 ```bash
-pip install diffusers safetensors pillow accelerate
+# With UV
+# Note: diffusers, pillow, and accelerate are already included in the main dependencies.
+# Only safetensors needs to be added separately if not already installed.
+uv pip install safetensors
 ```
 
-For advanced features:
+For testing and development:
 ```bash
-pip install -r test_requirements.txt  # Testing tools
+# With UV
+# Note: Test dependencies are kept separate from production dependencies
+# to minimize the installation footprint in production environments.
+# They are defined in pyproject.toml under [tool.uv.dev-dependencies]
+uv sync --dev
 ```
 
-**5. Verify Installation**
+**4. Verify Installation**
 ```bash
 # Test basic imports
-python -c "from lyra.router import AdaptiveRouter; print('Router OK')"
-python -c "from lyra.specialists import PragmatistSpecialist; print('Specialists OK')"
+uv run python -c "from lyra.router import AdaptiveRouter; print('Router OK')"
+uv run python -c "from lyra.specialists import PragmatistSpecialist; print('Specialists OK')"
 
 # Verify Flux setup (optional)
-python tools/verify_flux_setup.py
+uv run python tools/verify_flux_setup.py
 ```
 
-**6. Configure Environment**
+**5. Configure Environment**
 
 Create `.env` file in the root directory:
 ```bash
@@ -254,7 +306,7 @@ DEVELOPMENT_MODE=true  # Set to false for production
 LOG_LEVEL=INFO
 ```
 
-**7. Initialize ChromaDB**
+**6. Initialize ChromaDB**
 ```bash
 python -c "from lyra.router import AdaptiveRouter; import asyncio; asyncio.run(AdaptiveRouter('.').initialize())"
 ```
@@ -283,8 +335,7 @@ Models will be automatically downloaded from Hugging Face on first use. Ensure y
 
 **Start the Router (Local Testing):**
 ```bash
-cd emergence_core
-python lyra/router.py
+uv run emergence_core/lyra/router.py
 ```
 
 **Run with Cognitive Loop:**
@@ -296,7 +347,7 @@ The autonomous cognitive loop runs automatically when the router initializes:
 **Discord Integration:**
 ```bash
 # Ensure DISCORD_TOKEN is set in .env
-python run_discord_bot.py
+uv run run_discord_bot.py
 ```
 
 #### 8.5. Troubleshooting
@@ -305,7 +356,7 @@ python run_discord_bot.py
 
 1. **CUDA/GPU not detected:**
    ```bash
-   python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
+   uv run python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
    ```
    Install appropriate CUDA toolkit for your GPU.
 
@@ -319,32 +370,27 @@ python run_discord_bot.py
    # Reset ChromaDB
    rm -rf model_cache/chroma_db
    # Re-initialize
-   python emergence_core/build_index.py
-   ```
-
-4. **Import errors:**
-   Ensure you're in the virtual environment:
-   ```bash
-   which python  # Should point to .venv/bin/python
+   uv run emergence_core/build_index.py
    ```
 
 #### 8.6. Testing
 
+All testing commands should be run from the project root directory.
+
 **Run Test Suite:**
 ```bash
-cd emergence_core
-pytest tests/
+uv run pytest emergence_core/tests/
 ```
 
 **Test Sequential Workflow:**
 ```bash
-python test_sequential_workflow.py
+uv run python tests/test_sequential_workflow.py
 ```
 
 **Validate JSON Schemas:**
 ```bash
-python scripts/validate_json.py
-python scripts/validate_journal.py
+uv run python scripts/validate_json.py
+uv run python scripts/validate_journal.py
 ```
 
 #### 8.7. LMT Wallet Configuration
