@@ -235,7 +235,6 @@ class AlignmentScorer:
         tags = memory_data.get("tags", [])
         significance = memory_data.get("significance_score", 5)
         emotions = memory_data.get("emotional_signature", [])
-        metadata = memory_data.get("metadata", {})
         
         # Calculate component scores
         tag_score = self._score_tags(tags)
