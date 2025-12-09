@@ -233,7 +233,7 @@ class TestFrictionBasedCosts:
         """Test that UBI pays off debt first."""
         # Create debt
         self.wallet.attempt_spend(495, "Drain")
-        result = self.wallet.attempt_memory_store(
+        self.wallet.attempt_memory_store(
             alignment_score=0.9,
             memory_description="Critical memory",
             allow_overdraft=True
