@@ -202,7 +202,7 @@ class CognitiveCore:
             affect_update = self.affect.compute_update(self.workspace.broadcast())
             
             # 4. ACTION: Decide what to do
-            actions = self.action.decide(self.workspace.broadcast())
+            self.action.decide(self.workspace.broadcast())
             
             # 5. META-COGNITION: Introspect
             meta_percepts = self.meta_cognition.observe(self.workspace.broadcast())
