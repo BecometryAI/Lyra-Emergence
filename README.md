@@ -68,7 +68,7 @@ Lyra-Emergence implements a **computational functionalist** approach to consciou
                                ↓
                     ┌──────────────────────┐
                     │ LanguageInputParser  │
-                    │   (Gemma 12B)        │
+                    │  (Gemma 12B)         │
                     │   Natural Language   │
                     │         ↓            │
                     │  Structured Data     │
@@ -112,7 +112,7 @@ Lyra-Emergence implements a **computational functionalist** approach to consciou
                                ↓
                     ┌──────────────────────┐
                     │LanguageOutputGen.    │
-                    │   (Llama 70B)        │
+                    │  (Llama 3 70B)       │
                     │  Internal State      │
                     │         ↓            │
                     │  Natural Language    │
@@ -517,9 +517,11 @@ source .venv/bin/activate  # Linux/Mac
 The cognitive core requires sentence-transformers and scikit-learn, which are already included in the main dependencies. Verify installation:
 
 ```bash
-# Test cognitive core imports
+# Test cognitive core imports (requires Phase 1-2 to be complete)
 uv run python -c "from sentence_transformers import SentenceTransformer; print('Embeddings: OK')"
 uv run python -c "from emergence_core.lyra.cognitive_core import GlobalWorkspace; print('Cognitive Core: OK')"
+
+# Note: If Phase 2 is still in progress, some imports may not yet be available
 ```
 
 **4. Install Optional Dependencies**
@@ -582,7 +584,12 @@ The system uses a **sequential workflow**: Router → ONE Specialist → Voice
 - **Pragmatist (Llama-3.3-Nemotron-Super-49B-v1.5)**: Tool use and practical reasoning
 - **Philosopher (Jamba 52B)**: Ethical reflection and deep reasoning
 - **Artist (Flux.1-schnell)**: Visual and creative generation
-- **Voice (LLaMA 3 70B)**: Final synthesis and personality
+- **Voice (Llama 3 70B)**: Final synthesis and personality
+
+**Cognitive Core Models:**
+- **Input Parsing (Gemma 12B)**: Natural language → structured data
+- **Output Generation (Llama 3 70B)**: Internal state → natural language
+- **Embeddings (sentence-transformers)**: Text/image → vector representations
 
 **Development Mode:**
 For testing without loading full models, set `DEVELOPMENT_MODE=true` in your environment. This uses mock models for rapid iteration.
@@ -598,6 +605,7 @@ Models will be automatically downloaded from Hugging Face on first use. Ensure y
 **Option 1: Run Cognitive Core (New Architecture)**
 ```bash
 # Start the cognitive core with continuous recurrent loop
+# Note: Requires Phase 2+ completion. Check Project Status section for current phase.
 uv run python -m emergence_core.lyra.cognitive_core.core
 
 # The cognitive core will:
@@ -609,7 +617,7 @@ uv run python -m emergence_core.lyra.cognitive_core.core
 
 **Option 2: Run Legacy Router (Original Architecture)**
 ```bash
-# Start the router for legacy specialist system
+# Start the router for legacy specialist system (currently functional)
 uv run emergence_core/lyra/router.py
 ```
 
@@ -617,6 +625,7 @@ uv run emergence_core/lyra/router.py
 ```bash
 # Run the full system with cognitive core + specialists
 # (Integration in progress - see Phase 5 in Project Status)
+# Command will be available when Phase 5 is complete
 ```
 
 **Cognitive Loop Behavior:**
