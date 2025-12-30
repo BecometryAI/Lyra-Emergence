@@ -23,7 +23,7 @@ from enum import Enum
 class MonitoringLevel(Enum):
     """
     Granularity of self-monitoring.
-    
+
     MINIMAL: Only critical state and errors
     NORMAL: Standard operational monitoring
     DETAILED: Fine-grained tracking of all subsystems
@@ -39,11 +39,11 @@ class MonitoringLevel(Enum):
 class IntrospectiveReport:
     """
     Report on internal cognitive state and processing.
-    
+
     An introspective report is a structured observation of the system's own
     cognitive processes. These reports can be treated as percepts that enter
     the GlobalWorkspace, allowing the system to reason about itself.
-    
+
     Attributes:
         timestamp: When the report was generated
         monitoring_level: Granularity of monitoring that produced this report
@@ -64,7 +64,7 @@ class IntrospectiveReport:
     coherence_score: float
     insights: List[str]
     metadata: Dict[str, Any] = None
-    
+
     def __post_init__(self) -> None:
         if self.metadata is None:
             self.metadata = {}
@@ -73,12 +73,12 @@ class IntrospectiveReport:
 class SelfMonitor:
     """
     Observes and reports on internal cognitive state.
-    
+
     The SelfMonitor implements meta-cognition by treating the cognitive system
     itself as an object of observation. It generates introspective percepts that
     can enter the GlobalWorkspace, enabling the system to reason about its own
     processing and maintain self-awareness.
-    
+
     Key Responsibilities:
     - Monitor all cognitive subsystems (workspace, attention, perception, etc.)
     - Track processing metrics (speed, efficiency, resource usage)
@@ -86,7 +86,7 @@ class SelfMonitor:
     - Generate introspective reports for workspace inclusion
     - Maintain meta-cognitive history for pattern analysis
     - Support debugging and transparency through observability
-    
+
     Integration Points:
     - GlobalWorkspace: Introspective reports can enter as special percepts
     - AttentionController: Monitor attention allocation patterns
@@ -94,40 +94,40 @@ class SelfMonitor:
     - ActionSubsystem: Track action selection and outcomes
     - AffectSubsystem: Monitor emotional dynamics and regulation
     - CognitiveCore: Reports are generated in the main cognitive loop
-    
+
     Meta-Cognitive Capabilities:
     1. Process Monitoring: Track what the system is doing
        - Which subsystems are active
        - What information is in the workspace
        - What actions are being considered
-    
+
     2. Performance Monitoring: Assess how well it's working
        - Processing speed and efficiency
        - Resource utilization and bottlenecks
        - Goal progress and achievement
-    
+
     3. Anomaly Detection: Identify issues and unexpected patterns
        - Unusual attention patterns
        - Emotional instability
        - Goal conflicts or deadlocks
        - Degraded performance
-    
+
     4. Introspective Reporting: Generate natural language descriptions
        - "I am currently focused on goal X"
        - "My attention keeps shifting, suggesting distraction"
        - "I notice increased emotional arousal without clear cause"
-    
+
     This enables higher-order reasoning like:
     - "I'm stuck in a loop, I should try a different approach"
     - "My emotional state is biasing my perception, I should recalibrate"
     - "I'm operating at high cognitive load, I should simplify"
-    
+
     Attributes:
         monitoring_level: Granularity of monitoring
         report_history: Recent introspective reports
         anomaly_thresholds: Criteria for detecting issues
     """
-    
+
     def __init__(
         self,
         monitoring_level: MonitoringLevel = MonitoringLevel.NORMAL,
@@ -136,7 +136,7 @@ class SelfMonitor:
     ) -> None:
         """
         Initialize the self-monitor.
-        
+
         Args:
             monitoring_level: Granularity of self-monitoring
             history_size: Number of reports to maintain in history

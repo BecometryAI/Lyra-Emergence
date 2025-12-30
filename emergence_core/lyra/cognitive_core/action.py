@@ -22,7 +22,7 @@ from enum import Enum
 class ActionType(Enum):
     """
     Categories of actions the system can perform.
-    
+
     COMMUNICATE: Generate language output or other communication
     RETRIEVE: Query memory or external knowledge bases
     TOOL_USE: Invoke external tools or APIs
@@ -40,11 +40,11 @@ class ActionType(Enum):
 class Action:
     """
     Represents a single executable action.
-    
+
     An action is a concrete behavior that the system can perform in response
     to its current workspace state. Actions can range from generating language
     output to querying memory to invoking external tools.
-    
+
     Attributes:
         action_type: Category of action
         parameters: Action-specific parameters and arguments
@@ -59,7 +59,7 @@ class Action:
     expected_outcome: Optional[str] = None
     cost: float = 0.0
     metadata: Dict[str, Any] = None
-    
+
     def __post_init__(self) -> None:
         if self.metadata is None:
             self.metadata = {}
@@ -68,12 +68,12 @@ class Action:
 class ActionSubsystem:
     """
     Decides what actions to take based on current workspace state.
-    
+
     The ActionSubsystem translates the declarative content of the GlobalWorkspace
     (goals, percepts, emotions) into procedural action decisions. It implements
     goal-directed behavior by evaluating which actions best serve current goals
     given the current perceptual and emotional context.
-    
+
     Key Responsibilities:
     - Generate candidate actions based on workspace state
     - Evaluate action appropriateness given goals and context
@@ -81,14 +81,14 @@ class ActionSubsystem:
     - Execute chosen actions and monitor outcomes
     - Maintain action history for learning and adaptation
     - Handle action failures and implement fallback strategies
-    
+
     Integration Points:
     - GlobalWorkspace: Reads current goals, percepts, and emotions to guide action
     - AffectSubsystem: Emotional state influences action selection and urgency
     - PerceptionSubsystem: Action outcomes may generate new percepts
     - CognitiveCore: Actions are executed in the main cognitive loop
     - LanguageOutputGenerator: Communication actions trigger language generation
-    
+
     Action Selection Process:
     1. Generate candidate actions from current workspace state
     2. Evaluate each candidate based on:
@@ -99,17 +99,17 @@ class ActionSubsystem:
     3. Resolve conflicts between competing action tendencies
     4. Select highest-priority action(s) for execution
     5. Execute and monitor for expected outcomes
-    
+
     The action subsystem implements a "think then act" pattern where deliberation
     precedes execution, but can also support reactive behaviors when needed
     (e.g., interrupting planned actions in response to urgent percepts).
-    
+
     Attributes:
         action_repertoire: Available actions and their execution handlers
         action_history: Recent actions and their outcomes
         default_action: Fallback action when no clear choice exists
     """
-    
+
     def __init__(
         self,
         action_repertoire: Optional[Dict[str, Callable]] = None,
@@ -118,7 +118,7 @@ class ActionSubsystem:
     ) -> None:
         """
         Initialize the action subsystem.
-        
+
         Args:
             action_repertoire: Mapping of action names to execution handlers.
                 If None, starts with an empty repertoire that must be populated.

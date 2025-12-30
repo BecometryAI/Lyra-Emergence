@@ -26,14 +26,14 @@ from numpy.typing import NDArray
 class EmotionalState:
     """
     Represents emotional state in 3D space (VAD model).
-    
+
     Uses the Valence-Arousal-Dominance (VAD) model, a widely-used framework
     for representing emotional states in a continuous space:
-    
+
     - Valence: Pleasantness vs. unpleasantness (-1.0 to +1.0)
     - Arousal: Activation level, calm vs. excited (-1.0 to +1.0)
     - Dominance: Sense of control, submissive vs. dominant (-1.0 to +1.0)
-    
+
     Attributes:
         valence: Emotional valence (-1.0 = negative, +1.0 = positive)
         arousal: Activation level (-1.0 = calm, +1.0 = excited)
@@ -48,7 +48,7 @@ class EmotionalState:
     timestamp: datetime = None
     intensity: float = 0.0
     labels: List[str] = None
-    
+
     def __post_init__(self) -> None:
         if self.timestamp is None:
             self.timestamp = datetime.now()
@@ -56,7 +56,7 @@ class EmotionalState:
             self.labels = []
         # Calculate intensity as distance from neutral (0, 0, 0)
         self.intensity = np.sqrt(self.valence**2 + self.arousal**2 + self.dominance**2) / np.sqrt(3)
-    
+
     def to_vector(self) -> NDArray[np.float32]:
         """Convert to numpy vector for calculations."""
         return np.array([self.valence, self.arousal, self.dominance], dtype=np.float32)
@@ -65,12 +65,12 @@ class EmotionalState:
 class AffectSubsystem:
     """
     Maintains and updates emotional state using a 3-dimensional model.
-    
+
     The AffectSubsystem implements computational emotion using the Valence-Arousal-
     Dominance (VAD) model. It continuously updates emotional state based on appraisals
     of events, percepts, and internal states, and modulates other cognitive processes
     through emotional biasing.
-    
+
     Key Responsibilities:
     - Maintain current emotional state in continuous VAD space
     - Appraise events and percepts for emotional significance
@@ -79,7 +79,7 @@ class AffectSubsystem:
     - Bias memory retrieval toward mood-congruent memories
     - Modulate action selection based on emotional state
     - Track emotional history and detect patterns over time
-    
+
     Integration Points:
     - AttentionController: Emotional salience influences attention allocation
     - GlobalWorkspace: Current emotion is part of conscious content
@@ -87,7 +87,7 @@ class AffectSubsystem:
     - PerceptionSubsystem: Emotion affects interpretation of percepts
     - SelfMonitor: Emotional state is part of self-monitoring
     - CognitiveCore: Emotions are updated in each cognitive cycle
-    
+
     Emotional Dynamics:
     1. Appraisal: Events are evaluated for emotional significance
        - Goal relevance: Does this help or hinder current goals?
@@ -99,17 +99,17 @@ class AffectSubsystem:
        - Success/control increases dominance
     3. Decay: Emotions gradually return toward baseline (emotional regulation)
     4. Influence: Current emotion modulates other cognitive processes
-    
+
     The subsystem can represent both simple emotions (happiness, fear, anger)
     and complex emotional states through combinations of VAD dimensions.
-    
+
     Attributes:
         current_state: Current emotional state in VAD space
         baseline_state: Neutral/resting emotional state (target for decay)
         decay_rate: Rate of return to baseline (emotional regulation)
         emotional_history: Recent emotional states for pattern detection
     """
-    
+
     def __init__(
         self,
         baseline_valence: float = 0.0,
@@ -120,7 +120,7 @@ class AffectSubsystem:
     ) -> None:
         """
         Initialize the affect subsystem.
-        
+
         Args:
             baseline_valence: Resting valence level (-1.0 to +1.0)
             baseline_arousal: Resting arousal level (-1.0 to +1.0)
