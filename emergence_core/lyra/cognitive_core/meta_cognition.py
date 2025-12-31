@@ -371,11 +371,12 @@ class SelfMonitor:
             ("hide", "reveal")
         ]
         
-        for text in goal_texts:
-            for word1, word2 in conflict_pairs:
-                if any(word1 in t and word2 in other 
-                       for t in goal_texts for other in goal_texts if t != other):
-                    return True
+        for word1, word2 in conflict_pairs:
+            if any(
+                word1 in t and word2 in other
+                for t in goal_texts for other in goal_texts if t != other
+            ):
+                return True
         
         return False
     
