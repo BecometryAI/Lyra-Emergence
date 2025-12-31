@@ -32,6 +32,7 @@ from .meta_cognition import SelfMonitor
 from .memory_integration import MemoryIntegration
 from .language_input import LanguageInputParser
 from .language_output import LanguageOutputGenerator
+from .autonomous_initiation import AutonomousInitiationController
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -140,6 +141,12 @@ class CognitiveCore:
         # Initialize memory integration
         self.memory = MemoryIntegration(workspace=self.workspace, config=self.config.get("memory", {}))
         
+        # Initialize autonomous initiation controller
+        self.autonomous = AutonomousInitiationController(
+            workspace=self.workspace,
+            config=self.config.get("autonomous_initiation", {})
+        )
+        
         # Initialize language input parser (needs perception subsystem)
         self.language_input = LanguageInputParser(
             self.perception,
@@ -237,11 +244,12 @@ class CognitiveCore:
         4. AFFECT UPDATE: Compute emotional dynamics
         5. ACTION SELECTION: Decide what to do
         6. META-COGNITION: Generate introspective percepts
-        7. WORKSPACE UPDATE: Integrate all subsystem outputs
-        8. MEMORY CONSOLIDATION: Store significant states to long-term memory
-        9. BROADCAST: Make state available to subsystems
-        10. METRICS: Track performance
-        11. RATE LIMITING: Maintain ~10 Hz
+        7. AUTONOMOUS INITIATION: Check for autonomous speech triggers
+        8. WORKSPACE UPDATE: Integrate all subsystem outputs
+        9. MEMORY CONSOLIDATION: Store significant states to long-term memory
+        10. BROADCAST: Make state available to subsystems
+        11. METRICS: Track performance
+        12. RATE LIMITING: Maintain ~10 Hz
         """
         cycle_start = time.time()
         
@@ -279,7 +287,16 @@ class CognitiveCore:
             # 6. META-COGNITION: Introspect
             meta_percepts = self.meta_cognition.observe(self.workspace.broadcast())
             
-            # 7. WORKSPACE UPDATE: Integrate everything
+            # 7. AUTONOMOUS INITIATION: Check for autonomous speech triggers
+            snapshot = self.workspace.broadcast()
+            autonomous_goal = self.autonomous.check_for_autonomous_triggers(snapshot)
+            
+            if autonomous_goal:
+                # Add high-priority autonomous goal
+                self.workspace.add_goal(autonomous_goal)
+                logger.info(f"🗣️ Autonomous speech goal added: {autonomous_goal.description}")
+            
+            # 8. WORKSPACE UPDATE: Integrate everything
             updates = []
             
             # Add attended percepts
@@ -295,17 +312,17 @@ class CognitiveCore:
             
             self.workspace.update(updates)
             
-            # 8. MEMORY CONSOLIDATION: Commit workspace to long-term memory (if appropriate)
+            # 9. MEMORY CONSOLIDATION: Commit workspace to long-term memory (if appropriate)
             await self.memory.consolidate(self.workspace.broadcast())
             
-            # 9. BROADCAST: Make state available
+            # 10. BROADCAST: Make state available
             snapshot = self.workspace.broadcast()
             
-            # 10. METRICS: Track performance
+            # 11. METRICS: Track performance
             cycle_time = time.time() - cycle_start
             self._update_metrics(cycle_time)
             
-            # 11. RATE LIMITING: Maintain ~10 Hz
+            # 12. RATE LIMITING: Maintain ~10 Hz
             sleep_time = max(0, self.cycle_duration - cycle_time)
             await asyncio.sleep(sleep_time)
             
@@ -558,6 +575,34 @@ class CognitiveCore:
                         logger.warning("Output queue full, dropping response")
                 else:
                     logger.warning("Output queue not initialized, cannot output response")
+            
+            elif action.type == ActionType.SPEAK_AUTONOMOUS:
+                # Generate autonomous language output
+                snapshot = self.workspace.broadcast()
+                context = {
+                    "autonomous": True,
+                    "trigger": action.metadata.get("trigger"),
+                    "introspection_content": action.metadata.get("introspection_content")
+                }
+                
+                # Generate response using language output generator
+                response = await self.language_output.generate(snapshot, context)
+                
+                # Queue autonomous response for external retrieval
+                if self.output_queue is not None:
+                    try:
+                        self.output_queue.put_nowait({
+                            "type": "SPEAK_AUTONOMOUS",
+                            "text": response,
+                            "trigger": action.metadata.get("trigger"),
+                            "emotion": snapshot.emotions,
+                            "timestamp": datetime.now()
+                        })
+                        logger.info(f"🗣️💭 Lyra (autonomous): {response[:100]}...")
+                    except asyncio.QueueFull:
+                        logger.warning("Output queue full, dropping autonomous response")
+                else:
+                    logger.warning("Output queue not initialized, cannot output autonomous response")
                 
             elif action.type == ActionType.COMMIT_MEMORY:
                 # Commit current workspace to long-term memory

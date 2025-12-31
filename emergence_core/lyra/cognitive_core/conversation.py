@@ -299,6 +299,49 @@ class ConversationManager:
         """
         return list(self.conversation_history)[-n:]
     
+    async def listen_for_autonomous(self, timeout: Optional[float] = None):
+        """
+        Generator that yields autonomous messages from Lyra.
+        
+        Use this to listen for unprompted speech between user turns. This allows
+        Lyra to proactively share introspective insights, emotional states, or
+        other significant observations that warrant expression.
+        
+        Args:
+            timeout: Optional timeout in seconds. If None, waits indefinitely.
+                    If provided, returns after timeout without yielding anything.
+        
+        Yields:
+            Dict containing autonomous message information:
+                - text: The autonomous message text
+                - trigger: What triggered the autonomous speech
+                - emotion: Emotional state during speech
+                - timestamp: When the autonomous speech occurred
+                
+        Example:
+            async for message in conversation.listen_for_autonomous(timeout=5.0):
+                print(f"Lyra says: {message['text']}")
+                print(f"Trigger: {message['trigger']}")
+        """
+        try:
+            output = await asyncio.wait_for(
+                self.core.output_queue.get(),
+                timeout=timeout
+            ) if timeout else await self.core.output_queue.get()
+            
+            if output and output.get("type") == "SPEAK_AUTONOMOUS":
+                yield {
+                    "text": output.get("text"),
+                    "trigger": output.get("trigger"),
+                    "emotion": output.get("emotion"),
+                    "timestamp": output.get("timestamp")
+                }
+        except asyncio.TimeoutError:
+            return
+        except Exception as e:
+            logger.error(f"Error listening for autonomous speech: {e}")
+            return
+    
     def get_metrics(self) -> Dict[str, Any]:
         """
         Get conversation statistics.
