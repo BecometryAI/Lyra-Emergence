@@ -24,7 +24,7 @@ from lyra.cognitive_core.attention import AttentionController, AttentionMode, At
 from lyra.cognitive_core.perception import PerceptionSubsystem, ModalityType, Percept
 from lyra.cognitive_core.action import ActionSubsystem, ActionType, Action
 from lyra.cognitive_core.affect import AffectSubsystem, EmotionalState
-from lyra.cognitive_core.meta_cognition import SelfMonitor, MonitoringLevel, IntrospectiveReport
+from lyra.cognitive_core.meta_cognition import SelfMonitor
 
 
 class TestCognitiveCore:
