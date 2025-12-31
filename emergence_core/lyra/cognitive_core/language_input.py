@@ -228,6 +228,9 @@ class LanguageInputParser:
         of the user input. Scores each intent type and returns the highest
         scoring one, defaulting to STATEMENT if no patterns match.
         
+        More specific patterns (memory_request, introspection_request) are
+        checked with higher priority to avoid conflicts with generic patterns.
+        
         Args:
             text: Input text to classify
             
@@ -236,14 +239,32 @@ class LanguageInputParser:
         """
         text_lower = text.lower().strip()
         
-        # Initialize scores for each intent type
+        # Check high-priority specific patterns first
+        # These are more specific and should override generic patterns
+        high_priority_intents = [
+            IntentType.MEMORY_REQUEST,
+            IntentType.INTROSPECTION_REQUEST,
+            IntentType.GREETING,
+        ]
+        
+        for intent_type in high_priority_intents:
+            if intent_type in self.intent_patterns:
+                for pattern in self.intent_patterns[intent_type]:
+                    if re.search(pattern, text_lower):
+                        return Intent(
+                            type=intent_type,
+                            confidence=0.9,  # High confidence for specific matches
+                            metadata={}
+                        )
+        
+        # Now check remaining patterns
         intent_scores = {intent_type: 0.0 for intent_type in IntentType}
         
-        # Score each intent based on pattern matches
         for intent_type, patterns in self.intent_patterns.items():
-            for pattern in patterns:
-                if re.search(pattern, text_lower):
-                    intent_scores[intent_type] += 0.5
+            if intent_type not in high_priority_intents:  # Skip already checked
+                for pattern in patterns:
+                    if re.search(pattern, text_lower):
+                        intent_scores[intent_type] += 0.5
         
         # Get the highest scoring intent
         top_intent = max(intent_scores.items(), key=lambda x: x[1])
@@ -345,13 +366,22 @@ class LanguageInputParser:
         entities = {}
         
         # Extract names (capitalized words)
+        # Filter out common non-name words
+        common_words = {
+            "hi", "hello", "hey", "i", "you", "the", "a", "an", "my", "me", "is", "am",
+            "what", "when", "where", "who", "why", "how", "can", "could", "would", "should",
+            "please", "tell", "show", "help", "give", "make", "do", "does", "did"
+        }
         name_pattern = r'\b([A-Z][a-z]+)\b'
         names = re.findall(name_pattern, text)
         if names:
-            entities["names"] = names
-            # Update context with user name if not already set
-            if self.conversation_context["user_name"] is None and names:
-                self.conversation_context["user_name"] = names[0]
+            # Filter out common greeting/question words and short words
+            filtered_names = [n for n in names if n.lower() not in common_words and len(n) > 2]
+            if filtered_names:
+                entities["names"] = filtered_names
+                # Update context with user name if not already set
+                if self.conversation_context["user_name"] is None and filtered_names:
+                    self.conversation_context["user_name"] = filtered_names[0]
         
         # Extract topics (nouns after "about")
         topic_pattern = r'about ([\w\s]+?)(?:\.|,|\?|$)'
