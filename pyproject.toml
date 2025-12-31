@@ -66,6 +66,9 @@ asyncio_mode = "strict"
 testpaths = ["emergence_core/tests"]
 python_files = ["test_*.py"]
 addopts = "-v --tb=short"
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::UserWarning",
