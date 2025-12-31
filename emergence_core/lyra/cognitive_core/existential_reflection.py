@@ -317,7 +317,6 @@ class ExistentialReflection:
         
         Args:
             uncertainty: Uncertainty level of the question
-            uncertainty: Uncertainty level of the question
             snapshot: Current workspace state
             
         Returns:

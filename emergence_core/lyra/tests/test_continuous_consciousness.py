@@ -51,7 +51,8 @@ class TestTemporalAwareness:
         ta = TemporalAwareness()
         
         original_time = ta.last_interaction_time
-        asyncio.sleep(0.1)
+        import time
+        time.sleep(0.1)
         ta.update_last_interaction_time()
         
         assert ta.last_interaction_time > original_time
