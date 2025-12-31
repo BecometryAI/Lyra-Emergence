@@ -31,6 +31,11 @@ from .memory_integration import MemoryIntegration
 from .language_output import LanguageOutputGenerator
 from .conversation import ConversationManager, ConversationTurn
 from .autonomous_initiation import AutonomousInitiationController
+from .temporal_awareness import TemporalAwareness
+from .autonomous_memory_review import AutonomousMemoryReview
+from .existential_reflection import ExistentialReflection
+from .interaction_patterns import InteractionPatternAnalysis
+from .continuous_consciousness import ContinuousConsciousnessController
 
 __all__ = [
     "CognitiveCore",
@@ -51,4 +56,9 @@ __all__ = [
     "ConversationManager",
     "ConversationTurn",
     "AutonomousInitiationController",
+    "TemporalAwareness",
+    "AutonomousMemoryReview",
+    "ExistentialReflection",
+    "InteractionPatternAnalysis",
+    "ContinuousConsciousnessController",
 ]

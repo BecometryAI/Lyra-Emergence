@@ -33,6 +33,11 @@ from .memory_integration import MemoryIntegration
 from .language_input import LanguageInputParser
 from .language_output import LanguageOutputGenerator
 from .autonomous_initiation import AutonomousInitiationController
+from .temporal_awareness import TemporalAwareness
+from .autonomous_memory_review import AutonomousMemoryReview
+from .existential_reflection import ExistentialReflection
+from .interaction_patterns import InteractionPatternAnalysis
+from .continuous_consciousness import ContinuousConsciousnessController
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -147,6 +152,30 @@ class CognitiveCore:
             config=self.config.get("autonomous_initiation", {})
         )
         
+        # Initialize continuous consciousness components
+        self.temporal_awareness = TemporalAwareness(
+            config=self.config.get("temporal_awareness", {})
+        )
+        
+        self.memory_review = AutonomousMemoryReview(
+            self.memory,
+            config=self.config.get("memory_review", {})
+        )
+        
+        self.existential_reflection = ExistentialReflection(
+            config=self.config.get("existential_reflection", {})
+        )
+        
+        self.pattern_analysis = InteractionPatternAnalysis(
+            self.memory,
+            config=self.config.get("pattern_analysis", {})
+        )
+        
+        self.continuous_consciousness = ContinuousConsciousnessController(
+            self,
+            config=self.config.get("continuous_consciousness", {})
+        )
+        
         # Initialize language input parser (needs perception subsystem)
         self.language_input = LanguageInputParser(
             self.perception,
@@ -169,6 +198,10 @@ class CognitiveCore:
         # Control flags
         self.running = False
         self.cycle_duration = 1.0 / self.config["cycle_rate_hz"]
+        
+        # Task handles for dual loops
+        self.active_task: Optional[asyncio.Task] = None
+        self.idle_task: Optional[asyncio.Task] = None
         
         # Input queue - will be initialized in start()
         # Queue holds tuples of (raw_input, modality)
@@ -195,6 +228,10 @@ class CognitiveCore:
         
         Runs continuously until stop() is called. Handles exceptions gracefully
         to prevent crashes and maintains system stability.
+        
+        Now starts both active (fast) and idle (slow) cognitive loops:
+        - Active loop: Processes user input, runs at ~10 Hz
+        - Idle loop: Continuous consciousness, runs every ~10 seconds
         """
         logger.info("🧠 Starting CognitiveCore...")
         
@@ -208,19 +245,59 @@ class CognitiveCore:
         
         self.running = True
         
+        # Start active cognitive loop (existing fast cycle for conversations)
+        self.active_task = asyncio.create_task(self._active_cognitive_loop())
+        
+        # Start idle cognitive loop (new slow cycle for continuous consciousness)
+        self.idle_task = asyncio.create_task(
+            self.continuous_consciousness.start_idle_loop()
+        )
+        
+        logger.info("🧠 Cognitive core started (active + idle loops)")
+        
+        # Wait for both tasks to complete (they run until stop() is called)
+        await asyncio.gather(self.active_task, self.idle_task, return_exceptions=True)
+        
+        logger.info("🧠 CognitiveCore stopped gracefully.")
+
+    async def _active_cognitive_loop(self) -> None:
+        """
+        Run the active (fast) cognitive loop for conversation processing.
+        
+        This is the existing loop that runs at ~10 Hz for active conversation.
+        """
         while self.running:
             await self._cognitive_cycle()
         
-        logger.info("🧠 CognitiveCore stopped gracefully.")
+        logger.info("🧠 Active cognitive loop stopped.")
 
     async def stop(self) -> None:
         """
         Gracefully shut down the cognitive loop.
         
-        Saves final state, logs shutdown metrics, and ensures clean termination.
+        Saves final state, logs shutdown metrics, and ensures clean termination
+        of both active and idle loops.
         """
         logger.info("🧠 Stopping CognitiveCore...")
         self.running = False
+        
+        # Stop idle loop controller
+        await self.continuous_consciousness.stop()
+        
+        # Cancel both tasks if they exist
+        if self.active_task and not self.active_task.done():
+            self.active_task.cancel()
+            try:
+                await self.active_task
+            except asyncio.CancelledError:
+                pass
+        
+        if self.idle_task and not self.idle_task.done():
+            self.idle_task.cancel()
+            try:
+                await self.idle_task
+            except asyncio.CancelledError:
+                pass
         
         # Log final metrics
         avg_cycle_time = mean(self.metrics['cycle_times']) if self.metrics['cycle_times'] else 0.0
@@ -394,6 +471,8 @@ class CognitiveCore:
         the workspace, and queues the percept for processing in the next cycle.
         This is the high-level entry point for natural language interaction.
         
+        Also updates temporal awareness to track that an interaction occurred.
+        
         Args:
             text: Natural language user input
             context: Optional additional context for parsing
@@ -404,6 +483,9 @@ class CognitiveCore:
         if self.input_queue is None:
             logger.error("Cannot process language input: CognitiveCore not started yet")
             raise RuntimeError("CognitiveCore must be started before processing language input")
+        
+        # Update temporal awareness - record that interaction occurred
+        self.temporal_awareness.update_last_interaction_time()
         
         # Parse input into structured components
         parse_result = await self.language_input.parse(text, context)
