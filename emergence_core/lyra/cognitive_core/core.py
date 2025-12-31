@@ -176,22 +176,47 @@ class CognitiveCore:
             config=self.config.get("continuous_consciousness", {})
         )
         
-        # Initialize language input parser (needs perception subsystem)
+        # Initialize LLM clients for language interfaces
+        # Input LLM: Gemma 12B for parsing (lower temperature, structured output)
+        # Output LLM: Llama 70B for generation (higher temperature, creative)
+        from .llm_client import MockLLMClient, GemmaClient, LlamaClient
+        
+        input_llm_config = self.config.get("input_llm", {})
+        output_llm_config = self.config.get("output_llm", {})
+        
+        # Determine which LLM clients to use
+        if input_llm_config.get("use_real_model", False):
+            try:
+                self.llm_input_client = GemmaClient(input_llm_config)
+                logger.info("✅ Using real Gemma client for input parsing")
+            except Exception as e:
+                logger.warning(f"Failed to load Gemma client: {e}, using mock")
+                self.llm_input_client = MockLLMClient(input_llm_config)
+        else:
+            self.llm_input_client = MockLLMClient(input_llm_config)
+            logger.info("✅ Using mock LLM client for input parsing (development mode)")
+        
+        if output_llm_config.get("use_real_model", False):
+            try:
+                self.llm_output_client = LlamaClient(output_llm_config)
+                logger.info("✅ Using real Llama client for output generation")
+            except Exception as e:
+                logger.warning(f"Failed to load Llama client: {e}, using mock")
+                self.llm_output_client = MockLLMClient(output_llm_config)
+        else:
+            self.llm_output_client = MockLLMClient(output_llm_config)
+            logger.info("✅ Using mock LLM client for output generation (development mode)")
+        
+        # Initialize language input parser (needs perception subsystem and LLM client)
         self.language_input = LanguageInputParser(
             self.perception,
+            llm_client=self.llm_input_client,
             config=self.config.get("language_input", {})
         )
         
-        # Initialize language output generator
-        # Note: llm_client needs to be provided via config or will be None
-        llm_client = self.config.get("llm_client")
-        if llm_client is None:
-            # Create a mock LLM client for development
-            logger.warning("No LLM client provided, using mock LLM for development")
-            llm_client = MockLLMClient()
-        
+        # Initialize language output generator (needs LLM client)
         self.language_output = LanguageOutputGenerator(
-            llm_client,
+            self.llm_output_client,
             config=self.config.get("language_output", {})
         )
         

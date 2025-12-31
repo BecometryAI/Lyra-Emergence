@@ -28,7 +28,24 @@ from .action import ActionSubsystem
 from .affect import AffectSubsystem
 from .meta_cognition import SelfMonitor
 from .memory_integration import MemoryIntegration
+from .language_input import LanguageInputParser, IntentType, Intent, ParseResult
 from .language_output import LanguageOutputGenerator
+from .llm_client import LLMClient, GemmaClient, LlamaClient, MockLLMClient, LLMError
+from .structured_formats import (
+    LLMInputParseRequest,
+    LLMInputParseResponse,
+    OutputGenerationRequest,
+    OutputGenerationResponse,
+    ConversationContext,
+    EmotionalState,
+    WorkspaceStateSnapshot
+)
+from .fallback_handlers import (
+    FallbackInputParser,
+    FallbackOutputGenerator,
+    CircuitBreaker,
+    CircuitState
+)
 from .conversation import ConversationManager, ConversationTurn
 from .autonomous_initiation import AutonomousInitiationController
 from .temporal_awareness import TemporalAwareness
@@ -52,7 +69,27 @@ __all__ = [
     "AffectSubsystem",
     "SelfMonitor",
     "MemoryIntegration",
+    "LanguageInputParser",
+    "IntentType",
+    "Intent",
+    "ParseResult",
     "LanguageOutputGenerator",
+    "LLMClient",
+    "GemmaClient",
+    "LlamaClient",
+    "MockLLMClient",
+    "LLMError",
+    "LLMInputParseRequest",
+    "LLMInputParseResponse",
+    "OutputGenerationRequest",
+    "OutputGenerationResponse",
+    "ConversationContext",
+    "EmotionalState",
+    "WorkspaceStateSnapshot",
+    "FallbackInputParser",
+    "FallbackOutputGenerator",
+    "CircuitBreaker",
+    "CircuitState",
     "ConversationManager",
     "ConversationTurn",
     "AutonomousInitiationController",
