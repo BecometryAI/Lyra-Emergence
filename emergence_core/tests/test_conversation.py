@@ -76,7 +76,7 @@ class TestSingleTurn:
         manager = ConversationManager(core)
         
         # Start the core
-        core_task = asyncio.create_task(core.start())
+        asyncio.create_task(core.start())
         await asyncio.sleep(0.1)  # Let it initialize
         
         try:
