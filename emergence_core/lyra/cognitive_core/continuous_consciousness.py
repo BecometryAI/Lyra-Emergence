@@ -29,8 +29,6 @@ from typing import Dict, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from .core import CognitiveCore
 
-from .workspace import Goal
-
 logger = logging.getLogger(__name__)
 
 
