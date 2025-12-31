@@ -19,7 +19,7 @@ from typing import Optional, Dict, Any, List, Callable
 from collections import deque
 from enum import Enum
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field
 
 from .workspace import WorkspaceSnapshot, GoalType
 
