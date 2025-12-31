@@ -38,6 +38,7 @@ class ActionType(str, Enum):
     UPDATE_GOAL: Modify goal state
     WAIT: Do nothing (valid action!)
     TOOL_CALL: Execute external tool
+    SPEAK_AUTONOMOUS: Unprompted speech initiated by Lyra
     """
     SPEAK = "speak"
     COMMIT_MEMORY = "commit_memory"
@@ -46,6 +47,7 @@ class ActionType(str, Enum):
     UPDATE_GOAL = "update_goal"
     WAIT = "wait"
     TOOL_CALL = "tool_call"
+    SPEAK_AUTONOMOUS = "speak_autonomous"
 
 
 class Action(BaseModel):

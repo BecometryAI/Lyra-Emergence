@@ -34,6 +34,7 @@ class GoalType(str, Enum):
     INTROSPECT = "introspect"
     LEARN = "learn"
     CREATE = "create"
+    SPEAK_AUTONOMOUS = "speak_autonomous"  # Unprompted speech initiated by Lyra
 
 
 class Goal(BaseModel):
