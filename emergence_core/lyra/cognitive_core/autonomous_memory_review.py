@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 import random
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 from collections import Counter
 
 from .workspace import GlobalWorkspace, WorkspaceSnapshot, Percept
