@@ -508,14 +508,14 @@ JSON Response:"""
             "respond_to_user": GoalType.RESPOND_TO_USER,
             "retrieve_memory": GoalType.RETRIEVE_MEMORY,
             "introspect": GoalType.INTROSPECT,
-            "explore": GoalType.EXPLORE,
-            "maintain": GoalType.MAINTAIN,
-            "other": GoalType.OTHER
+            "learn": GoalType.LEARN,
+            "create": GoalType.CREATE,
+            "other": GoalType.RESPOND_TO_USER  # Map other to respond_to_user
         }
         
         for goal_data in goals_data:
             goal_type_str = goal_data.get("type", "other")
-            goal_type = goal_type_mapping.get(goal_type_str, GoalType.OTHER)
+            goal_type = goal_type_mapping.get(goal_type_str, GoalType.RESPOND_TO_USER)
             
             goals.append(Goal(
                 type=goal_type,

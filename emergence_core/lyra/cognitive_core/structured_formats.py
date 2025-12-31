@@ -35,8 +35,8 @@ class GoalTypeEnum(str, Enum):
     RESPOND_TO_USER = "respond_to_user"
     RETRIEVE_MEMORY = "retrieve_memory"
     INTROSPECT = "introspect"
-    EXPLORE = "explore"
-    MAINTAIN = "maintain"
+    LEARN = "learn"
+    CREATE = "create"
     OTHER = "other"
 
 
@@ -250,8 +250,8 @@ def parse_response_to_goals(parse_response: LLMInputParseResponse, workspace_goa
         "respond_to_user": "RESPOND_TO_USER",
         "retrieve_memory": "RETRIEVE_MEMORY",
         "introspect": "INTROSPECT",
-        "explore": "EXPLORE",
-        "maintain": "MAINTAIN",
+        "learn": "LEARN",
+        "create": "CREATE",
         "other": "OTHER"
     }
     
