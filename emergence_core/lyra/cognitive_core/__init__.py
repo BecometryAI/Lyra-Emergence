@@ -28,6 +28,7 @@ from .action import ActionSubsystem
 from .affect import AffectSubsystem
 from .meta_cognition import SelfMonitor
 from .memory_integration import MemoryIntegration
+from .language_output import LanguageOutputGenerator
 
 __all__ = [
     "CognitiveCore",
@@ -44,4 +45,5 @@ __all__ = [
     "AffectSubsystem",
     "SelfMonitor",
     "MemoryIntegration",
+    "LanguageOutputGenerator",
 ]

@@ -21,6 +21,7 @@ import time
 from typing import Optional, Dict, Any, List
 from collections import deque
 from statistics import mean
+from datetime import datetime
 
 from .workspace import GlobalWorkspace, Percept, WorkspaceSnapshot, GoalType
 from .attention import AttentionController
@@ -30,6 +31,7 @@ from .affect import AffectSubsystem
 from .meta_cognition import SelfMonitor
 from .memory_integration import MemoryIntegration
 from .language_input import LanguageInputParser
+from .language_output import LanguageOutputGenerator
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -41,6 +43,15 @@ DEFAULT_CONFIG = {
     "max_queue_size": 100,
     "log_interval_cycles": 100
 }
+
+
+class MockLLMClient:
+    """Mock LLM client for development/testing when no real LLM is available."""
+    
+    async def generate(self, prompt: str, temperature: float = 0.7, max_tokens: int = 500) -> str:
+        """Generate a mock response."""
+        return "This is a mock response from the development LLM client. " \
+               "In production, this would be replaced with a real LLM."
 
 
 class CognitiveCore:
@@ -135,6 +146,19 @@ class CognitiveCore:
             config=self.config.get("language_input", {})
         )
         
+        # Initialize language output generator
+        # Note: llm_client needs to be provided via config or will be None
+        llm_client = self.config.get("llm_client")
+        if llm_client is None:
+            # Create a mock LLM client for development
+            logger.warning("No LLM client provided, using mock LLM for development")
+            llm_client = MockLLMClient()
+        
+        self.language_output = LanguageOutputGenerator(
+            llm_client,
+            config=self.config.get("language_output", {})
+        )
+        
         # Control flags
         self.running = False
         self.cycle_duration = 1.0 / self.config["cycle_rate_hz"]
@@ -142,6 +166,10 @@ class CognitiveCore:
         # Input queue - will be initialized in start()
         # Queue holds tuples of (raw_input, modality)
         self.input_queue: Optional[asyncio.Queue] = None
+        
+        # Output queue - will be initialized in start()
+        # Queue holds output dicts with type, text, emotion, timestamp
+        self.output_queue: Optional[asyncio.Queue] = None
         
         # Performance metrics
         self.metrics: Dict[str, Any] = {
@@ -166,6 +194,10 @@ class CognitiveCore:
         # Initialize input queue in async context
         if self.input_queue is None:
             self.input_queue = asyncio.Queue(maxsize=self.config["max_queue_size"])
+        
+        # Initialize output queue in async context
+        if self.output_queue is None:
+            self.output_queue = asyncio.Queue(maxsize=self.config["max_queue_size"])
         
         self.running = True
         
@@ -409,6 +441,64 @@ class CognitiveCore:
             'workspace_size': len(self.workspace.active_percepts),
             'current_goals': len(self.workspace.current_goals),
         }
+    
+    async def get_response(self, timeout: float = 5.0) -> Optional[Dict]:
+        """
+        Get Lyra's response from the output queue (blocking with timeout).
+        
+        Waits for output from the cognitive system and returns it. Used by
+        external systems to retrieve generated responses (SPEAK actions).
+        
+        Args:
+            timeout: Maximum time to wait for output (seconds)
+            
+        Returns:
+            Dict with keys: type, text, emotion, timestamp
+            None if timeout reached without output
+            
+        Raises:
+            RuntimeError: If output queue not initialized (call start() first)
+        """
+        if self.output_queue is None:
+            raise RuntimeError("Output queue not initialized. Call start() first.")
+        
+        try:
+            output = await asyncio.wait_for(
+                self.output_queue.get(),
+                timeout=timeout
+            )
+            return output
+        except asyncio.TimeoutError:
+            return None
+    
+    async def chat(self, message: str, timeout: float = 5.0) -> str:
+        """
+        Convenience method: Send message and get text response.
+        
+        High-level chat interface that processes language input and waits
+        for a text response. Combines process_language_input() and
+        get_response() for simple conversational interaction.
+        
+        Args:
+            message: User's text message
+            timeout: Maximum time to wait for response (seconds)
+            
+        Returns:
+            Response text string, or "..." if no response within timeout
+            
+        Raises:
+            RuntimeError: If queues not initialized (call start() first)
+        """
+        # Process input
+        await self.process_language_input(message)
+        
+        # Wait for response
+        output = await self.get_response(timeout)
+        
+        if output and output.get("type") == "SPEAK":
+            return output.get("text", "...")
+        
+        return "..."
 
     def _update_metrics(self, cycle_time: float) -> None:
         """
@@ -445,9 +535,29 @@ class CognitiveCore:
         
         try:
             if action.type == ActionType.SPEAK:
-                # Queue for language output (will be handled by output subsystem)
-                logger.debug(f"Action SPEAK queued for output: {action.reason}")
-                # TODO: Implement output queue in future phase
+                # Generate language output from current workspace state
+                snapshot = self.workspace.broadcast()
+                context = {
+                    "user_input": action.metadata.get("responding_to", "")
+                }
+                
+                # Generate response using language output generator
+                response = await self.language_output.generate(snapshot, context)
+                
+                # Queue response for external retrieval
+                if self.output_queue is not None:
+                    try:
+                        self.output_queue.put_nowait({
+                            "type": "SPEAK",
+                            "text": response,
+                            "emotion": snapshot.emotions,
+                            "timestamp": datetime.now()
+                        })
+                        logger.info(f"🗣️ Lyra: {response[:100]}...")
+                    except asyncio.QueueFull:
+                        logger.warning("Output queue full, dropping response")
+                else:
+                    logger.warning("Output queue not initialized, cannot output response")
                 
             elif action.type == ActionType.COMMIT_MEMORY:
                 # Commit current workspace to long-term memory
