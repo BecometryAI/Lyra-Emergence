@@ -185,12 +185,16 @@ class Lyra:
         """
         Initialize the synchronous Lyra wrapper.
         
+        Creates a new event loop for managing async operations.
+        Note: This wrapper creates its own event loop and should not be used
+        in applications that already have an active event loop.
+        
         Args:
             config: Optional configuration dict (same as LyraAPI)
         """
         self.api = LyraAPI(config)
         self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)
+        # Note: We don't set this as the global event loop to avoid interference
         
         logger.info("✅ Lyra (synchronous) initialized")
     

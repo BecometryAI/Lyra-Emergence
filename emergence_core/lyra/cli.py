@@ -23,10 +23,15 @@ import asyncio
 import sys
 from pathlib import Path
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-from lyra.client import LyraAPI
+# Note: This import path manipulation is for development/testing only.
+# In production, install the package properly using pip/uv.
+# For proper installation, see README.md installation instructions.
+try:
+    from lyra.client import LyraAPI
+except ImportError:
+    # Fallback for development: add parent directory to path
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from lyra.client import LyraAPI
 
 
 async def main():

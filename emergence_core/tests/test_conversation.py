@@ -535,5 +535,5 @@ class TestTopicExtraction:
         
         topics = manager._extract_topics("I am happy today because weather is nice")
         
-        # Short words like "am" should be filtered
-        assert not any(len(word) <= 4 for word in topics)
+        # Short words like "am" and words <= 4 chars should be filtered
+        assert all(len(word) > 4 for word in topics)

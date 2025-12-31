@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 import asyncio
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Deque
 from dataclasses import dataclass, field
 from datetime import datetime
 from collections import deque
@@ -25,6 +25,11 @@ from collections import deque
 from .core import CognitiveCore
 
 logger = logging.getLogger(__name__)
+
+# Constants
+DEFAULT_RESPONSE_TIMEOUT_ERROR = "I apologize, I'm having trouble formulating a response right now."
+DEFAULT_ERROR_MESSAGE = "I encountered an error processing that. Could you rephrase?"
+DEFAULT_STOPWORDS = {"the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "is", "it", "that", "this", "with"}
 
 
 @dataclass
@@ -88,7 +93,7 @@ class ConversationManager:
         
         # Dialogue state
         max_history = self.config.get("max_history_size", 100)
-        self.conversation_history: deque[ConversationTurn] = deque(maxlen=max_history)
+        self.conversation_history: Deque[ConversationTurn] = deque(maxlen=max_history)
         self.current_topics: List[str] = []
         self.turn_count = 0
         
@@ -147,7 +152,7 @@ class ConversationManager:
             if response is None:
                 logger.warning("⏱️ Response timeout")
                 self.metrics["timeouts"] += 1
-                response = "I apologize, I'm having trouble formulating a response right now."
+                response = DEFAULT_RESPONSE_TIMEOUT_ERROR
             
             # Get emotional state
             snapshot = self.core.workspace.broadcast()
@@ -188,7 +193,7 @@ class ConversationManager:
             # Return error turn
             return ConversationTurn(
                 user_input=user_input,
-                system_response="I encountered an error processing that. Could you rephrase?",
+                system_response=DEFAULT_ERROR_MESSAGE,
                 timestamp=start_time,
                 response_time=0.0,
                 emotional_state={},
@@ -257,8 +262,8 @@ class ConversationManager:
         Returns:
             List of up to 3 extracted topic words
         """
-        # Remove common words
-        stopwords = {"the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "is", "it", "that", "this", "with"}
+        # Get stopwords from config or use default
+        stopwords = self.config.get("stopwords", DEFAULT_STOPWORDS)
         words = text.lower().split()
         topics = [w for w in words if len(w) > 4 and w not in stopwords]
         return topics[:3]  # Top 3 content words
