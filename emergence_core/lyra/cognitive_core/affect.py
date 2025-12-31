@@ -23,7 +23,7 @@ import logging
 import numpy as np
 from numpy.typing import NDArray
 
-from .workspace import WorkspaceSnapshot, Goal, Percept
+from .workspace import WorkspaceSnapshot, Goal
 from .action import Action, ActionType
 
 # Configure logging
