@@ -28,7 +28,6 @@ from .cognitive_core import (
     Percept
 )
 from .adaptive_router import AdaptiveRouter
-from .router_model import RouterModel
 
 logger = logging.getLogger(__name__)
 
