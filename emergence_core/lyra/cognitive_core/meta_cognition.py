@@ -16,16 +16,70 @@ from __future__ import annotations
 
 import logging
 import json
+import uuid
 from typing import Optional, Dict, Any, List
 from collections import deque
 from pathlib import Path
 from datetime import datetime
+from dataclasses import dataclass, field
 
 import numpy as np
 
 from .workspace import GlobalWorkspace, WorkspaceSnapshot, Percept, GoalType
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class PredictionRecord:
+    """
+    Comprehensive record of a single prediction.
+    
+    Attributes:
+        id: Unique prediction identifier
+        timestamp: When prediction was made
+        category: Type of prediction (action, emotion, capability, etc.)
+        predicted_state: What was predicted
+        predicted_confidence: Confidence in prediction (0.0-1.0)
+        actual_state: What actually happened (filled after observation)
+        correct: Whether prediction was correct (filled after validation)
+        error_magnitude: Size of prediction error if continuous
+        context: Contextual information at prediction time
+        validated_at: When prediction was validated
+        self_model_version: Self-model state at prediction time
+    """
+    id: str
+    timestamp: datetime
+    category: str
+    predicted_state: Dict[str, Any]
+    predicted_confidence: float
+    actual_state: Optional[Dict[str, Any]] = None
+    correct: Optional[bool] = None
+    error_magnitude: Optional[float] = None
+    context: Dict[str, Any] = field(default_factory=dict)
+    validated_at: Optional[datetime] = None
+    self_model_version: int = 0
+
+
+@dataclass
+class AccuracySnapshot:
+    """
+    Point-in-time accuracy snapshot.
+    
+    Attributes:
+        timestamp: When snapshot was taken
+        overall_accuracy: Overall accuracy at this time
+        category_accuracies: Accuracies by category
+        calibration_score: Calibration quality
+        prediction_count: Number of predictions in window
+        self_model_version: Self-model version at this time
+    """
+    timestamp: datetime
+    overall_accuracy: float
+    category_accuracies: Dict[str, float]
+    calibration_score: float
+    prediction_count: int
+    self_model_version: int
 
 
 class IntrospectiveJournal:
@@ -233,6 +287,30 @@ class SelfMonitor:
         self.prediction_history = deque(maxlen=500)  # Track predictions vs reality
         self.behavioral_log = deque(maxlen=1000)     # Detailed behavior tracking
         
+        # Phase 4.3: Enhanced prediction tracking
+        self.prediction_records: Dict[str, PredictionRecord] = {}  # id -> record
+        self.pending_validations: deque = deque(maxlen=100)
+        self.self_model_version = 0
+        
+        # Accuracy metrics by category
+        self.accuracy_by_category: Dict[str, List[float]] = {
+            "action": [],
+            "emotion": [],
+            "capability": [],
+            "goal_priority": [],
+            "value_alignment": []
+        }
+        
+        # Confidence calibration data
+        self.calibration_bins: Dict[float, List[bool]] = {
+            0.1: [], 0.2: [], 0.3: [], 0.4: [], 0.5: [],
+            0.6: [], 0.7: [], 0.8: [], 0.9: [], 1.0: []
+        }
+        
+        # Temporal accuracy tracking
+        self.accuracy_history: deque = deque(maxlen=1000)  # Historical snapshots
+        self.daily_snapshots: Dict[str, AccuracySnapshot] = {}
+        
         # Configuration for new features
         self.self_model_update_frequency = self.config.get("self_model_update_frequency", 5)
         self.prediction_confidence_threshold = self.config.get("prediction_confidence_threshold", 0.6)
@@ -240,6 +318,19 @@ class SelfMonitor:
         self.enable_existential_questions = self.config.get("enable_existential_questions", True)
         self.enable_capability_tracking = self.config.get("enable_capability_tracking", True)
         self.enable_value_alignment_tracking = self.config.get("enable_value_alignment_tracking", True)
+        
+        # Phase 4.3: Additional configuration
+        prediction_config = self.config.get("prediction_tracking", {})
+        self.prediction_tracking_enabled = prediction_config.get("enabled", True)
+        self.max_pending_validations = prediction_config.get("max_pending_validations", 100)
+        self.auto_validate_enabled = prediction_config.get("auto_validate", True)
+        self.validation_timeout = prediction_config.get("validation_timeout", 600)
+        
+        refinement_config = self.config.get("self_model_refinement", {})
+        self.auto_refine_enabled = refinement_config.get("auto_refine", True)
+        self.refinement_threshold = refinement_config.get("refinement_threshold", 0.3)
+        self.learning_rate = refinement_config.get("learning_rate", 0.1)
+        self.require_min_samples = refinement_config.get("require_min_samples", 5)
         
         # Stats
         self.stats = {
@@ -251,7 +342,10 @@ class SelfMonitor:
             "pattern_detections": 0,
             "self_model_updates": 0,
             "predictions_made": 0,
-            "behavioral_inconsistencies": 0
+            "behavioral_inconsistencies": 0,
+            "predictions_validated": 0,
+            "accuracy_snapshots_taken": 0,
+            "self_model_refinements": 0
         }
         
         logger.info("✅ SelfMonitor initialized")
@@ -884,6 +978,773 @@ class SelfMonitor:
             "sample_size": total_predictions
         }
     
+    def record_prediction(
+        self,
+        category: str,
+        predicted_state: Dict[str, Any],
+        confidence: float,
+        context: Dict[str, Any]
+    ) -> str:
+        """
+        Record a new prediction for future validation.
+        
+        Args:
+            category: Prediction category (action, emotion, capability, etc.)
+            predicted_state: What is being predicted
+            confidence: Confidence level (0.0-1.0)
+            context: Contextual information
+            
+        Returns:
+            Prediction ID for later validation
+        """
+        if not self.prediction_tracking_enabled:
+            return ""
+        
+        # Generate unique prediction ID
+        prediction_id = str(uuid.uuid4())
+        
+        # Create prediction record
+        record = PredictionRecord(
+            id=prediction_id,
+            timestamp=datetime.now(),
+            category=category,
+            predicted_state=predicted_state,
+            predicted_confidence=confidence,
+            context=context,
+            self_model_version=self.self_model_version
+        )
+        
+        # Store record
+        self.prediction_records[prediction_id] = record
+        self.pending_validations.append(prediction_id)
+        
+        # Maintain max pending validations
+        while len(self.pending_validations) > self.max_pending_validations:
+            old_id = self.pending_validations.popleft()
+            # Remove old record if not validated
+            if old_id in self.prediction_records and self.prediction_records[old_id].correct is None:
+                del self.prediction_records[old_id]
+        
+        logger.debug(f"📝 Recorded prediction {prediction_id[:8]} (category: {category}, confidence: {confidence:.2f})")
+        
+        return prediction_id
+    
+    def validate_prediction(
+        self,
+        prediction_id: str,
+        actual_state: Dict[str, Any]
+    ) -> Optional[PredictionRecord]:
+        """
+        Validate a prediction against actual outcome.
+        
+        Compares predicted vs actual state, calculates accuracy,
+        updates metrics, and triggers self-model refinement if needed.
+        
+        Args:
+            prediction_id: ID of prediction to validate
+            actual_state: Actual observed state
+            
+        Returns:
+            Updated prediction record with validation results, or None if not found
+        """
+        if prediction_id not in self.prediction_records:
+            logger.warning(f"⚠️ Prediction {prediction_id[:8]} not found for validation")
+            return None
+        
+        record = self.prediction_records[prediction_id]
+        
+        # Already validated
+        if record.correct is not None:
+            return record
+        
+        # Validate based on category
+        correct = False
+        error_magnitude = 0.0
+        
+        if record.category == "action":
+            # Check if predicted action matches actual
+            predicted_action = record.predicted_state.get("action")
+            actual_action = actual_state.get("action")
+            correct = str(predicted_action) == str(actual_action)
+            error_magnitude = 0.0 if correct else 1.0
+            
+        elif record.category == "emotion":
+            # Calculate emotion prediction error
+            predicted_vad = record.predicted_state.get("emotional_prediction", {})
+            actual_vad = actual_state.get("emotions", {})
+            
+            if predicted_vad and actual_vad:
+                errors = []
+                for dim in ["valence", "arousal", "dominance"]:
+                    pred_val = predicted_vad.get(dim, 0.0)
+                    actual_val = actual_vad.get(dim, 0.0)
+                    errors.append(abs(pred_val - actual_val))
+                error_magnitude = sum(errors) / len(errors)
+                # Consider correct if average error < 0.3
+                correct = error_magnitude < 0.3
+            
+        elif record.category == "capability":
+            # Check if capability assessment was correct
+            predicted_success = record.predicted_state.get("can_succeed", True)
+            actual_success = actual_state.get("success", False)
+            correct = predicted_success == actual_success
+            error_magnitude = 0.0 if correct else 1.0
+            
+        elif record.category == "goal_priority":
+            # Check if goal priority prediction was close
+            predicted_priority = record.predicted_state.get("priority", 0.5)
+            actual_priority = actual_state.get("priority", 0.5)
+            error_magnitude = abs(predicted_priority - actual_priority)
+            correct = error_magnitude < 0.2
+            
+        elif record.category == "value_alignment":
+            # Check if value alignment assessment was correct
+            predicted_aligned = record.predicted_state.get("aligned", True)
+            actual_aligned = actual_state.get("aligned", True)
+            correct = predicted_aligned == actual_aligned
+            error_magnitude = 0.0 if correct else 1.0
+        
+        # Update record
+        record.actual_state = actual_state
+        record.correct = correct
+        record.error_magnitude = error_magnitude
+        record.validated_at = datetime.now()
+        
+        # Update metrics
+        self.accuracy_by_category[record.category].append(1.0 if correct else 0.0)
+        
+        # Update calibration bins
+        confidence_bin = round(record.predicted_confidence, 1)
+        if confidence_bin in self.calibration_bins:
+            self.calibration_bins[confidence_bin].append(correct)
+        
+        # Add to prediction history (legacy format for compatibility)
+        self.prediction_history.append({
+            "category": record.category,
+            "correct": correct,
+            "confidence": record.predicted_confidence,
+            "error_magnitude": error_magnitude,
+            "timestamp": record.timestamp.isoformat()
+        })
+        
+        # Remove from pending
+        if prediction_id in list(self.pending_validations):
+            # Create new deque without this ID
+            new_pending = deque(maxlen=self.max_pending_validations)
+            for pid in self.pending_validations:
+                if pid != prediction_id:
+                    new_pending.append(pid)
+            self.pending_validations = new_pending
+        
+        self.stats["predictions_validated"] += 1
+        
+        logger.info(f"✅ Validated prediction {prediction_id[:8]}: {'correct' if correct else 'incorrect'} (error: {error_magnitude:.2f})")
+        
+        return record
+    
+    def auto_validate_predictions(self, snapshot: WorkspaceSnapshot) -> List[PredictionRecord]:
+        """
+        Automatically validate pending predictions based on current state.
+        
+        Checks pending predictions against workspace state and validates
+        any that can be resolved based on available information.
+        
+        Args:
+            snapshot: Current workspace snapshot
+            
+        Returns:
+            List of newly validated prediction records
+        """
+        if not self.auto_validate_enabled:
+            return []
+        
+        validated_records = []
+        current_time = datetime.now()
+        
+        # Check each pending prediction
+        for prediction_id in list(self.pending_validations):
+            if prediction_id not in self.prediction_records:
+                continue
+            
+            record = self.prediction_records[prediction_id]
+            
+            # Skip if already validated
+            if record.correct is not None:
+                continue
+            
+            # Check if prediction has timed out
+            age_seconds = (current_time - record.timestamp).total_seconds()
+            if age_seconds > self.validation_timeout:
+                # Remove expired prediction
+                if prediction_id in list(self.pending_validations):
+                    new_pending = deque(maxlen=self.max_pending_validations)
+                    for pid in self.pending_validations:
+                        if pid != prediction_id:
+                            new_pending.append(pid)
+                    self.pending_validations = new_pending
+                del self.prediction_records[prediction_id]
+                logger.debug(f"⏰ Expired prediction {prediction_id[:8]} (age: {age_seconds:.0f}s)")
+                continue
+            
+            # Try to validate based on snapshot
+            actual_state = None
+            
+            if record.category == "emotion":
+                # Can validate emotion predictions
+                actual_state = {"emotions": snapshot.emotions}
+                
+            elif record.category == "goal_priority":
+                # Check if we have the goal in current snapshot
+                goal_desc = record.predicted_state.get("goal_description")
+                if goal_desc:
+                    for goal in snapshot.goals:
+                        if goal_desc in (goal.description if hasattr(goal, 'description') else ''):
+                            priority = goal.priority if hasattr(goal, 'priority') else goal.get('priority', 0.5)
+                            actual_state = {"priority": priority}
+                            break
+            
+            # Validate if we have actual state
+            if actual_state:
+                validated = self.validate_prediction(prediction_id, actual_state)
+                if validated:
+                    validated_records.append(validated)
+        
+        if validated_records:
+            logger.info(f"🔍 Auto-validated {len(validated_records)} predictions")
+        
+        return validated_records
+    
+    def get_accuracy_metrics(self, time_window: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Get detailed accuracy metrics.
+        
+        Args:
+            time_window: Optional time window in seconds (None = all time)
+            
+        Returns:
+            Comprehensive accuracy metrics including:
+            - Overall accuracy
+            - Accuracy by category
+            - Accuracy by confidence level
+            - Temporal trends
+            - Error patterns
+            - Calibration quality
+        """
+        # Filter by time window if specified
+        records = list(self.prediction_records.values())
+        if time_window:
+            cutoff_time = datetime.now().timestamp() - time_window
+            records = [r for r in records if r.timestamp.timestamp() >= cutoff_time]
+        
+        # Filter to validated records only
+        validated_records = [r for r in records if r.correct is not None]
+        
+        if not validated_records:
+            return self._empty_accuracy_metrics()
+        
+        # Overall accuracy
+        correct_count = sum(1 for r in validated_records if r.correct)
+        overall_accuracy = correct_count / len(validated_records)
+        
+        # Accuracy by category
+        by_category = {}
+        for category in self.accuracy_by_category.keys():
+            cat_records = [r for r in validated_records if r.category == category]
+            if cat_records:
+                cat_correct = sum(1 for r in cat_records if r.correct)
+                by_category[category] = {
+                    "accuracy": cat_correct / len(cat_records),
+                    "count": len(cat_records)
+                }
+            else:
+                by_category[category] = {"accuracy": 0.0, "count": 0}
+        
+        # Accuracy by confidence level
+        by_confidence = {
+            "0.0-0.2": {"accuracy": 0.0, "count": 0},
+            "0.2-0.4": {"accuracy": 0.0, "count": 0},
+            "0.4-0.6": {"accuracy": 0.0, "count": 0},
+            "0.6-0.8": {"accuracy": 0.0, "count": 0},
+            "0.8-1.0": {"accuracy": 0.0, "count": 0}
+        }
+        
+        for r in validated_records:
+            if r.predicted_confidence <= 0.2:
+                key = "0.0-0.2"
+            elif r.predicted_confidence <= 0.4:
+                key = "0.2-0.4"
+            elif r.predicted_confidence <= 0.6:
+                key = "0.4-0.6"
+            elif r.predicted_confidence <= 0.8:
+                key = "0.6-0.8"
+            else:
+                key = "0.8-1.0"
+            
+            by_confidence[key]["count"] += 1
+            if r.correct:
+                by_confidence[key]["accuracy"] += 1
+        
+        # Calculate accuracy percentages
+        for key in by_confidence:
+            if by_confidence[key]["count"] > 0:
+                by_confidence[key]["accuracy"] /= by_confidence[key]["count"]
+        
+        # Calibration analysis
+        calibration = self.calculate_confidence_calibration()
+        
+        # Temporal trends
+        temporal_trends = self._calculate_temporal_trends(validated_records)
+        
+        # Error patterns
+        error_patterns = self.detect_systematic_biases()
+        
+        return {
+            "overall": {
+                "accuracy": overall_accuracy,
+                "total_predictions": len(records),
+                "validated_predictions": len(validated_records),
+                "pending_validations": len(self.pending_validations)
+            },
+            "by_category": by_category,
+            "by_confidence_level": by_confidence,
+            "calibration": calibration,
+            "temporal_trends": temporal_trends,
+            "error_patterns": error_patterns
+        }
+    
+    def _empty_accuracy_metrics(self) -> Dict[str, Any]:
+        """Return empty accuracy metrics structure."""
+        return {
+            "overall": {
+                "accuracy": 0.0,
+                "total_predictions": 0,
+                "validated_predictions": 0,
+                "pending_validations": len(self.pending_validations)
+            },
+            "by_category": {
+                "action": {"accuracy": 0.0, "count": 0},
+                "emotion": {"accuracy": 0.0, "count": 0},
+                "capability": {"accuracy": 0.0, "count": 0},
+                "goal_priority": {"accuracy": 0.0, "count": 0},
+                "value_alignment": {"accuracy": 0.0, "count": 0}
+            },
+            "by_confidence_level": {
+                "0.0-0.2": {"accuracy": 0.0, "count": 0},
+                "0.2-0.4": {"accuracy": 0.0, "count": 0},
+                "0.4-0.6": {"accuracy": 0.0, "count": 0},
+                "0.6-0.8": {"accuracy": 0.0, "count": 0},
+                "0.8-1.0": {"accuracy": 0.0, "count": 0}
+            },
+            "calibration": {
+                "calibration_score": 0.0,
+                "overconfidence": 0.0,
+                "underconfidence": 0.0,
+                "calibration_curve": []
+            },
+            "temporal_trends": {
+                "recent_accuracy": 0.0,
+                "weekly_accuracy": 0.0,
+                "trend_direction": "stable"
+            },
+            "error_patterns": {
+                "common_errors": [],
+                "error_contexts": [],
+                "systematic_biases": []
+            }
+        }
+    
+    def calculate_confidence_calibration(self) -> Dict[str, Any]:
+        """
+        Analyze confidence calibration quality.
+        
+        Good calibration means: when I say 80% confident, I'm correct 80% of the time.
+        
+        Returns:
+            Calibration analysis with metrics and visualization data
+        """
+        calibration_curve = []
+        overconfidence_total = 0.0
+        underconfidence_total = 0.0
+        bin_count = 0
+        
+        for confidence_level, results in self.calibration_bins.items():
+            if not results:
+                continue
+            
+            accuracy = sum(results) / len(results)
+            calibration_curve.append((confidence_level, accuracy))
+            
+            # Calculate calibration error
+            error = confidence_level - accuracy
+            if error > 0:
+                overconfidence_total += error
+            else:
+                underconfidence_total += abs(error)
+            bin_count += 1
+        
+        # Sort calibration curve
+        calibration_curve.sort()
+        
+        # Calculate overall calibration score (1.0 = perfect, 0.0 = terrible)
+        if bin_count > 0:
+            avg_error = (overconfidence_total + underconfidence_total) / bin_count
+            calibration_score = max(0.0, 1.0 - avg_error)
+        else:
+            calibration_score = 0.0
+        
+        return {
+            "calibration_score": calibration_score,
+            "overconfidence": overconfidence_total / bin_count if bin_count > 0 else 0.0,
+            "underconfidence": underconfidence_total / bin_count if bin_count > 0 else 0.0,
+            "calibration_curve": calibration_curve
+        }
+    
+    def detect_systematic_biases(self) -> Dict[str, Any]:
+        """
+        Identify systematic prediction errors.
+        
+        Examples:
+        - Always overestimating emotional arousal
+        - Consistently underestimating task difficulty
+        - Systematic capability overconfidence in certain domains
+        
+        Returns:
+            Dictionary with detected biases and patterns
+        """
+        biases = {
+            "common_errors": [],
+            "error_contexts": [],
+            "systematic_biases": []
+        }
+        
+        # Get validated records
+        validated_records = [r for r in self.prediction_records.values() if r.correct is not None]
+        
+        if len(validated_records) < 10:
+            return biases
+        
+        # Detect emotion prediction biases
+        emotion_records = [r for r in validated_records if r.category == "emotion" and r.error_magnitude is not None]
+        if len(emotion_records) >= 5:
+            avg_error = sum(r.error_magnitude for r in emotion_records) / len(emotion_records)
+            if avg_error > 0.3:
+                biases["systematic_biases"].append({
+                    "type": "emotion_prediction_bias",
+                    "description": f"Systematic emotion prediction error (avg: {avg_error:.2f})",
+                    "severity": min(1.0, avg_error)
+                })
+        
+        # Detect action prediction biases
+        action_records = [r for r in validated_records if r.category == "action"]
+        if action_records:
+            action_errors = [r for r in action_records if not r.correct]
+            if len(action_errors) / len(action_records) > 0.5:
+                # Identify common error contexts
+                error_contexts = set()
+                for r in action_errors:
+                    if "context" in r.context:
+                        error_contexts.add(r.context.get("context", "unknown"))
+                
+                if error_contexts:
+                    biases["error_contexts"] = list(error_contexts)[:5]
+        
+        # Detect confidence biases
+        high_conf_records = [r for r in validated_records if r.predicted_confidence > 0.8]
+        if high_conf_records:
+            high_conf_correct = sum(1 for r in high_conf_records if r.correct)
+            high_conf_accuracy = high_conf_correct / len(high_conf_records)
+            
+            if high_conf_accuracy < 0.7:
+                biases["systematic_biases"].append({
+                    "type": "overconfidence_bias",
+                    "description": f"High confidence predictions often incorrect ({high_conf_accuracy:.1%} accurate)",
+                    "severity": 1.0 - high_conf_accuracy
+                })
+        
+        # Find common error types
+        error_records = [r for r in validated_records if not r.correct]
+        error_categories = {}
+        for r in error_records:
+            error_categories[r.category] = error_categories.get(r.category, 0) + 1
+        
+        if error_categories:
+            most_common = sorted(error_categories.items(), key=lambda x: x[1], reverse=True)[:3]
+            biases["common_errors"] = [
+                {"category": cat, "count": count} for cat, count in most_common
+            ]
+        
+        return biases
+    
+    def _calculate_temporal_trends(self, validated_records: List[PredictionRecord]) -> Dict[str, Any]:
+        """
+        Calculate temporal accuracy trends.
+        
+        Args:
+            validated_records: List of validated prediction records
+            
+        Returns:
+            Temporal trend analysis
+        """
+        if len(validated_records) < 5:
+            return {
+                "recent_accuracy": 0.0,
+                "weekly_accuracy": 0.0,
+                "trend_direction": "stable"
+            }
+        
+        now = datetime.now()
+        
+        # Recent accuracy (last 24 hours)
+        recent_cutoff = now.timestamp() - (24 * 60 * 60)
+        recent_records = [r for r in validated_records if r.timestamp.timestamp() >= recent_cutoff]
+        if recent_records:
+            recent_accuracy = sum(1 for r in recent_records if r.correct) / len(recent_records)
+        else:
+            recent_accuracy = 0.0
+        
+        # Weekly accuracy (last 7 days)
+        weekly_cutoff = now.timestamp() - (7 * 24 * 60 * 60)
+        weekly_records = [r for r in validated_records if r.timestamp.timestamp() >= weekly_cutoff]
+        if weekly_records:
+            weekly_accuracy = sum(1 for r in weekly_records if r.correct) / len(weekly_records)
+        else:
+            weekly_accuracy = 0.0
+        
+        # Determine trend direction
+        if len(validated_records) >= 20:
+            # Compare first half vs second half
+            mid = len(validated_records) // 2
+            first_half = validated_records[:mid]
+            second_half = validated_records[mid:]
+            
+            first_accuracy = sum(1 for r in first_half if r.correct) / len(first_half)
+            second_accuracy = sum(1 for r in second_half if r.correct) / len(second_half)
+            
+            diff = second_accuracy - first_accuracy
+            if diff > 0.05:
+                trend_direction = "improving"
+            elif diff < -0.05:
+                trend_direction = "declining"
+            else:
+                trend_direction = "stable"
+        else:
+            trend_direction = "stable"
+        
+        return {
+            "recent_accuracy": recent_accuracy,
+            "weekly_accuracy": weekly_accuracy,
+            "trend_direction": trend_direction
+        }
+    
+    def refine_self_model_from_errors(self, prediction_records: List[PredictionRecord]) -> None:
+        """
+        Automatically refine self-model based on prediction errors.
+        
+        Analyzes recent prediction errors and adjusts:
+        - Capability confidence levels
+        - Limitation boundaries
+        - Behavioral trait estimates
+        - Value priority orderings
+        
+        Args:
+            prediction_records: Recent validated predictions to learn from
+        """
+        if not self.auto_refine_enabled:
+            return
+        
+        if len(prediction_records) < self.require_min_samples:
+            logger.debug(f"Not enough samples for refinement ({len(prediction_records)} < {self.require_min_samples})")
+            return
+        
+        refinement_made = False
+        
+        for record in prediction_records:
+            if record.correct is None or record.error_magnitude is None:
+                continue
+            
+            # Only refine on significant errors
+            if record.error_magnitude < self.refinement_threshold:
+                continue
+            
+            # Refine based on category
+            if record.category == "action":
+                action_type = str(record.predicted_state.get("action", "unknown"))
+                self.adjust_capability_confidence(
+                    action_type,
+                    record.error_magnitude,
+                    record.context
+                )
+                refinement_made = True
+                
+            elif record.category == "capability":
+                capability = record.predicted_state.get("capability", "unknown")
+                success = record.actual_state.get("success", False) if record.actual_state else False
+                difficulty = record.context.get("difficulty", 0.5)
+                
+                self.update_limitation_boundaries(
+                    capability,
+                    success,
+                    difficulty,
+                    record.context
+                )
+                refinement_made = True
+                
+            elif record.category == "emotion":
+                # Update behavioral traits based on emotion prediction errors
+                if record.actual_state and "emotions" in record.actual_state:
+                    actual_valence = record.actual_state["emotions"].get("valence", 0.0)
+                    
+                    if "average_valence" in self.self_model["behavioral_traits"]:
+                        old_val = self.self_model["behavioral_traits"]["average_valence"]
+                        # Adjust toward actual with learning rate
+                        new_val = old_val + self.learning_rate * (actual_valence - old_val)
+                        self.self_model["behavioral_traits"]["average_valence"] = new_val
+                        refinement_made = True
+        
+        if refinement_made:
+            self.self_model_version += 1
+            self.stats["self_model_refinements"] += 1
+            logger.info(f"🔄 Refined self-model (version {self.self_model_version})")
+    
+    def adjust_capability_confidence(
+        self,
+        capability: str,
+        prediction_error: float,
+        error_context: Dict
+    ) -> None:
+        """
+        Adjust confidence in a specific capability based on error.
+        
+        If I predicted I could do X with 90% confidence but failed,
+        lower the confidence. If I was uncertain but succeeded, raise it.
+        
+        Args:
+            capability: Capability to adjust
+            prediction_error: Size of error (0.0 = perfect, 1.0 = completely wrong)
+            error_context: Context of the error
+        """
+        if capability not in self.self_model["capabilities"]:
+            # Initialize if not exists
+            self.self_model["capabilities"][capability] = {
+                "attempts": 1,
+                "successes": 0 if prediction_error > 0.5 else 1,
+                "confidence": 0.5
+            }
+            return
+        
+        cap = self.self_model["capabilities"][capability]
+        
+        # Adjust confidence based on error magnitude
+        # Large errors should decrease confidence more
+        adjustment = -self.learning_rate * prediction_error
+        
+        # Update confidence within bounds [0.0, 1.0]
+        new_confidence = max(0.0, min(1.0, cap["confidence"] + adjustment))
+        cap["confidence"] = new_confidence
+        
+        logger.debug(f"Adjusted {capability} confidence: {cap['confidence']:.2f} (error: {prediction_error:.2f})")
+    
+    def update_limitation_boundaries(
+        self,
+        capability: str,
+        success: bool,
+        difficulty: float,
+        context: Dict
+    ) -> None:
+        """
+        Update understanding of capability boundaries.
+        
+        Tracks the edge cases: what's the hardest version of X I can do?
+        Where do my capabilities stop working?
+        
+        Args:
+            capability: Capability being tested
+            success: Whether attempt succeeded
+            difficulty: Estimated difficulty of attempt (0.0-1.0)
+            context: Contextual information
+        """
+        if capability not in self.self_model["limitations"]:
+            self.self_model["limitations"][capability] = []
+        
+        # Record boundary point
+        boundary_point = {
+            "success": success,
+            "difficulty": difficulty,
+            "context": context,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        limitations = self.self_model["limitations"][capability]
+        limitations.append(boundary_point)
+        
+        # Keep only recent boundary points (last 10)
+        if len(limitations) > 10:
+            self.self_model["limitations"][capability] = limitations[-10:]
+        
+        # Update capability confidence based on success rate at this difficulty
+        if capability in self.self_model["capabilities"]:
+            cap = self.self_model["capabilities"][capability]
+            
+            # If failed at low difficulty, significantly reduce confidence
+            if not success and difficulty < 0.3:
+                cap["confidence"] = max(0.1, cap["confidence"] - 0.2)
+            # If succeeded at high difficulty, increase confidence
+            elif success and difficulty > 0.7:
+                cap["confidence"] = min(0.95, cap["confidence"] + 0.1)
+        
+        logger.debug(f"Updated {capability} boundary: success={success}, difficulty={difficulty:.2f}")
+    
+    def identify_capability_gaps(self) -> List[Dict[str, Any]]:
+        """
+        Identify areas where self-model needs more data.
+        
+        Returns:
+            List of capabilities with insufficient prediction history
+            or high uncertainty that need more exploration
+        """
+        gaps = []
+        
+        # Check each capability for data gaps
+        for capability, cap_data in self.self_model["capabilities"].items():
+            attempts = cap_data.get("attempts", 0)
+            confidence = cap_data.get("confidence", 0.5)
+            
+            # Gap if too few attempts
+            if attempts < 5:
+                gaps.append({
+                    "capability": capability,
+                    "reason": "insufficient_data",
+                    "attempts": attempts,
+                    "recommended_action": "Test this capability more"
+                })
+            
+            # Gap if confidence is uncertain (around 0.5)
+            elif 0.4 <= confidence <= 0.6:
+                gaps.append({
+                    "capability": capability,
+                    "reason": "high_uncertainty",
+                    "confidence": confidence,
+                    "recommended_action": "Gather more evidence to clarify capability level"
+                })
+        
+        # Check for prediction categories with few samples
+        validated_records = [r for r in self.prediction_records.values() if r.correct is not None]
+        category_counts = {}
+        for record in validated_records:
+            category_counts[record.category] = category_counts.get(record.category, 0) + 1
+        
+        for category in ["action", "emotion", "capability", "goal_priority", "value_alignment"]:
+            count = category_counts.get(category, 0)
+            if count < 10:
+                gaps.append({
+                    "category": category,
+                    "reason": "few_predictions",
+                    "count": count,
+                    "recommended_action": f"Make more predictions in {category} category"
+                })
+        
+        return gaps
+    
     def analyze_behavioral_consistency(self, snapshot: WorkspaceSnapshot) -> Optional[Percept]:
         """
         Check if current behavior aligns with past patterns and stated values.
@@ -1215,6 +2076,344 @@ class SelfMonitor:
             return confidence > self.prediction_confidence_threshold
         
         return False
+    
+    def generate_accuracy_report(self, format: str = "text") -> str:
+        """
+        Generate human-readable accuracy report.
+        
+        Args:
+            format: Output format ("text", "markdown", "json")
+            
+        Returns:
+            Formatted report on self-model prediction quality
+        """
+        metrics = self.get_accuracy_metrics()
+        
+        if format == "json":
+            return json.dumps(metrics, indent=2)
+        
+        # Generate text or markdown report
+        is_markdown = (format == "markdown")
+        
+        # Header
+        if is_markdown:
+            report = "# SELF-MODEL ACCURACY REPORT\n\n"
+        else:
+            report = "=== SELF-MODEL ACCURACY REPORT ===\n"
+        
+        report += f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+        
+        # Overall performance
+        if is_markdown:
+            report += "## OVERALL PERFORMANCE\n\n"
+        else:
+            report += "OVERALL PERFORMANCE\n"
+        
+        overall = metrics["overall"]
+        report += f"- Accuracy: {overall['accuracy']:.1%} ({overall['validated_predictions']}/{overall['total_predictions']} predictions validated)\n"
+        
+        calibration_score = metrics["calibration"]["calibration_score"]
+        if calibration_score > 0.8:
+            cal_quality = "well calibrated"
+        elif calibration_score > 0.6:
+            cal_quality = "moderately calibrated"
+        else:
+            cal_quality = "poorly calibrated"
+        report += f"- Calibration Score: {calibration_score:.2f} ({cal_quality})\n"
+        
+        trend = metrics["temporal_trends"]["trend_direction"]
+        if trend == "improving":
+            trend_str = "Improving ✓"
+        elif trend == "declining":
+            trend_str = "Declining ✗"
+        else:
+            trend_str = "Stable →"
+        report += f"- Trend: {trend_str}\n\n"
+        
+        # Accuracy by category
+        if is_markdown:
+            report += "## ACCURACY BY CATEGORY\n\n"
+        else:
+            report += "ACCURACY BY CATEGORY\n"
+        
+        by_cat = metrics["by_category"]
+        for category, data in sorted(by_cat.items(), key=lambda x: x[1]["accuracy"], reverse=True):
+            if data["count"] == 0:
+                continue
+            
+            accuracy = data["accuracy"]
+            count = data["count"]
+            
+            # Quality assessment
+            if accuracy >= 0.8:
+                quality = "STRONG" if not is_markdown else "**STRONG**"
+            elif accuracy >= 0.6:
+                quality = "MODERATE" if not is_markdown else "**MODERATE**"
+            else:
+                quality = "NEEDS IMPROVEMENT" if not is_markdown else "**NEEDS IMPROVEMENT**"
+            
+            report += f"- {category.replace('_', ' ').title()}: {accuracy:.1%} ({count} predictions) - {quality}\n"
+        
+        report += "\n"
+        
+        # Calibration analysis
+        if is_markdown:
+            report += "## CALIBRATION ANALYSIS\n\n"
+        else:
+            report += "CALIBRATION ANALYSIS\n"
+        
+        calibration = metrics["calibration"]
+        overconf = calibration["overconfidence"]
+        underconf = calibration["underconfidence"]
+        
+        if overconf > 0.05:
+            report += f"- Slight overconfidence detected (+{overconf:.2f})\n"
+            report += f"- Recommendation: Lower confidence estimates slightly\n"
+        elif underconf > 0.05:
+            report += f"- Slight underconfidence detected (+{underconf:.2f})\n"
+            report += f"- Recommendation: Increase confidence estimates slightly\n"
+        else:
+            report += "- Confidence well-calibrated ✓\n"
+        
+        # Show calibration curve examples
+        if calibration["calibration_curve"]:
+            report += "\nConfidence vs Accuracy:\n"
+            for conf, acc in calibration["calibration_curve"][:5]:
+                report += f"  {conf:.0%} confident → {acc:.0%} accurate\n"
+        
+        report += "\n"
+        
+        # Identified biases
+        if is_markdown:
+            report += "## IDENTIFIED BIASES\n\n"
+        else:
+            report += "IDENTIFIED BIASES\n"
+        
+        error_patterns = metrics["error_patterns"]
+        if error_patterns["systematic_biases"]:
+            for bias in error_patterns["systematic_biases"]:
+                report += f"- {bias['description']}\n"
+        else:
+            report += "- No systematic biases detected\n"
+        
+        report += "\n"
+        
+        # Capability gaps
+        gaps = self.identify_capability_gaps()
+        if gaps:
+            if is_markdown:
+                report += "## CAPABILITY GAPS\n\n"
+            else:
+                report += "CAPABILITY GAPS\n"
+            
+            # Group by reason
+            by_reason = {}
+            for gap in gaps:
+                reason = gap.get("reason", "unknown")
+                if reason not in by_reason:
+                    by_reason[reason] = []
+                by_reason[reason].append(gap)
+            
+            if "insufficient_data" in by_reason:
+                caps = [g.get("capability", "unknown") for g in by_reason["insufficient_data"][:3]]
+                report += f"- Need more data on: {', '.join(caps)}\n"
+            
+            if "high_uncertainty" in by_reason:
+                caps = [g.get("capability", "unknown") for g in by_reason["high_uncertainty"][:3]]
+                report += f"- High uncertainty in: {', '.join(caps)}\n"
+        
+        report += "\n"
+        
+        # Recent improvements/declines
+        if is_markdown:
+            report += "## RECENT TRENDS\n\n"
+        else:
+            report += "RECENT TRENDS\n"
+        
+        temporal = metrics["temporal_trends"]
+        recent = temporal["recent_accuracy"]
+        weekly = temporal["weekly_accuracy"]
+        
+        if recent > 0:
+            report += f"- Recent accuracy (24h): {recent:.1%}\n"
+        if weekly > 0:
+            report += f"- Weekly accuracy (7d): {weekly:.1%}\n"
+        
+        if temporal["trend_direction"] == "improving":
+            report += "- Overall trend: Improving accuracy over time ✓\n"
+        elif temporal["trend_direction"] == "declining":
+            report += "- Overall trend: Declining accuracy - needs attention\n"
+        else:
+            report += "- Overall trend: Stable performance\n"
+        
+        # Footer
+        if is_markdown:
+            report += "\n---\n"
+        else:
+            report += "\n=== END REPORT ===\n"
+        
+        return report
+    
+    def generate_prediction_summary(self, prediction_records: List[PredictionRecord]) -> Dict:
+        """
+        Summarize a set of predictions.
+        
+        Args:
+            prediction_records: Records to summarize
+            
+        Returns:
+            Summary statistics and insights
+        """
+        if not prediction_records:
+            return {
+                "total": 0,
+                "validated": 0,
+                "pending": 0,
+                "accuracy": 0.0,
+                "avg_confidence": 0.0,
+                "by_category": {}
+            }
+        
+        validated = [r for r in prediction_records if r.correct is not None]
+        pending = len(prediction_records) - len(validated)
+        
+        if validated:
+            accuracy = sum(1 for r in validated if r.correct) / len(validated)
+            avg_confidence = sum(r.predicted_confidence for r in validated) / len(validated)
+        else:
+            accuracy = 0.0
+            avg_confidence = 0.0
+        
+        # Group by category
+        by_category = {}
+        for record in prediction_records:
+            cat = record.category
+            if cat not in by_category:
+                by_category[cat] = {"total": 0, "validated": 0, "correct": 0}
+            
+            by_category[cat]["total"] += 1
+            if record.correct is not None:
+                by_category[cat]["validated"] += 1
+                if record.correct:
+                    by_category[cat]["correct"] += 1
+        
+        # Calculate category accuracies
+        for cat, data in by_category.items():
+            if data["validated"] > 0:
+                data["accuracy"] = data["correct"] / data["validated"]
+            else:
+                data["accuracy"] = 0.0
+        
+        return {
+            "total": len(prediction_records),
+            "validated": len(validated),
+            "pending": pending,
+            "accuracy": accuracy,
+            "avg_confidence": avg_confidence,
+            "by_category": by_category,
+            "summary_text": f"{len(validated)}/{len(prediction_records)} predictions validated with {accuracy:.1%} accuracy"
+        }
+    
+    def record_accuracy_snapshot(self) -> AccuracySnapshot:
+        """
+        Capture current accuracy state.
+        
+        Returns:
+            Accuracy snapshot for this moment
+        """
+        metrics = self.get_accuracy_metrics()
+        
+        # Extract category accuracies
+        category_accuracies = {
+            cat: data["accuracy"]
+            for cat, data in metrics["by_category"].items()
+        }
+        
+        snapshot = AccuracySnapshot(
+            timestamp=datetime.now(),
+            overall_accuracy=metrics["overall"]["accuracy"],
+            category_accuracies=category_accuracies,
+            calibration_score=metrics["calibration"]["calibration_score"],
+            prediction_count=metrics["overall"]["validated_predictions"],
+            self_model_version=self.self_model_version
+        )
+        
+        # Store snapshot
+        self.accuracy_history.append(snapshot)
+        
+        # Store daily snapshot (one per day)
+        date_key = snapshot.timestamp.strftime("%Y-%m-%d")
+        self.daily_snapshots[date_key] = snapshot
+        
+        self.stats["accuracy_snapshots_taken"] += 1
+        
+        logger.debug(f"📸 Captured accuracy snapshot (accuracy: {snapshot.overall_accuracy:.1%})")
+        
+        return snapshot
+    
+    def get_accuracy_trend(self, days: int = 7) -> Dict[str, Any]:
+        """
+        Analyze accuracy trends over time.
+        
+        Args:
+            days: Number of days to analyze
+            
+        Returns:
+            Trend analysis with direction and rate of change
+        """
+        if not self.accuracy_history:
+            return {
+                "trend_direction": "stable",
+                "rate_of_change": 0.0,
+                "snapshots_analyzed": 0,
+                "start_accuracy": 0.0,
+                "end_accuracy": 0.0
+            }
+        
+        # Filter to time window
+        cutoff = datetime.now().timestamp() - (days * 24 * 60 * 60)
+        recent_snapshots = [
+            s for s in self.accuracy_history
+            if s.timestamp.timestamp() >= cutoff
+        ]
+        
+        if len(recent_snapshots) < 2:
+            return {
+                "trend_direction": "stable",
+                "rate_of_change": 0.0,
+                "snapshots_analyzed": len(recent_snapshots),
+                "start_accuracy": recent_snapshots[0].overall_accuracy if recent_snapshots else 0.0,
+                "end_accuracy": recent_snapshots[0].overall_accuracy if recent_snapshots else 0.0
+            }
+        
+        # Calculate trend
+        start_accuracy = recent_snapshots[0].overall_accuracy
+        end_accuracy = recent_snapshots[-1].overall_accuracy
+        change = end_accuracy - start_accuracy
+        
+        # Determine direction
+        if change > 0.05:
+            direction = "improving"
+        elif change < -0.05:
+            direction = "declining"
+        else:
+            direction = "stable"
+        
+        # Calculate rate of change (per day)
+        time_span_days = (recent_snapshots[-1].timestamp - recent_snapshots[0].timestamp).total_seconds() / (24 * 60 * 60)
+        if time_span_days > 0:
+            rate = change / time_span_days
+        else:
+            rate = 0.0
+        
+        return {
+            "trend_direction": direction,
+            "rate_of_change": rate,
+            "snapshots_analyzed": len(recent_snapshots),
+            "start_accuracy": start_accuracy,
+            "end_accuracy": end_accuracy,
+            "total_change": change
+        }
     
     def get_stats(self) -> Dict[str, Any]:
         """
