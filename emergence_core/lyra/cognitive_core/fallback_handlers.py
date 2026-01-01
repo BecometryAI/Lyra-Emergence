@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 import time
 import re
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Optional
 from collections import deque
 from datetime import datetime
 from enum import Enum
