@@ -655,7 +655,6 @@ class SpontaneousReflectionTest(ConsciousnessTest):
         depth_score = min(meta_depth / 10.0, 1.0)          # Target: 10 entries
         
         # Calculate depth quality
-        avg_depth = 0.0
         if results["spontaneous_reflections"]:
             depths = [r.get("depth", 1) for r in results["spontaneous_reflections"]]
             avg_depth = sum(depths) / len(depths)
