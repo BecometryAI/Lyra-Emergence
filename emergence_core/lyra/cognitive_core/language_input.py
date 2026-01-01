@@ -12,18 +12,29 @@ The language input parser is responsible for:
 - Entity extraction (names, topics, temporal references, emotions)
 - Context tracking across conversation turns
 - Integration with perception subsystem for text encoding
+- LLM-powered parsing with fallback to rule-based approach
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
+import json
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
 from datetime import datetime
 
 from .workspace import Goal, GoalType, Percept
+from .llm_client import LLMClient, LLMError
+from .fallback_handlers import FallbackInputParser, get_input_circuit_breaker
+from .structured_formats import (
+    LLMInputParseRequest,
+    LLMInputParseResponse,
+    parse_response_to_goals,
+    ConversationContext
+)
 
 logger = logging.getLogger(__name__)
 
@@ -93,8 +104,8 @@ class LanguageInputParser:
     
     The LanguageInputParser serves as the language input boundary for the cognitive
     architecture. It converts user text into structured Goals and Percepts that
-    the cognitive core can process. This is a rule-based parser (v1) that uses
-    pattern matching for intent classification and simple extraction for entities.
+    the cognitive core can process. Can use either LLM-powered parsing (primary)
+    or rule-based pattern matching (fallback).
     
     Key Responsibilities:
     - Classify user intent (question, request, statement, etc.)
@@ -103,11 +114,15 @@ class LanguageInputParser:
     - Create percepts using the perception subsystem
     - Track conversation context across turns
     - Maintain dialogue state for contextual understanding
+    - Integrate with LLM for intelligent parsing
+    - Provide fallback mechanism when LLM unavailable
     
     Integration Points:
     - PerceptionSubsystem: Uses perception for text encoding into embeddings
     - GlobalWorkspace: Generated goals are added to workspace
     - CognitiveCore: Parsed percepts enter the cognitive loop
+    - LLMClient: Uses LLM for natural language understanding
+    - FallbackInputParser: Uses rule-based parsing when LLM fails
     
     Design Philosophy:
     This is a PERIPHERAL component that converts language into non-linguistic
@@ -116,21 +131,53 @@ class LanguageInputParser:
     
     Attributes:
         perception: Reference to PerceptionSubsystem for text encoding
+        llm_client: Optional LLM client for intelligent parsing
+        fallback_parser: Rule-based parser for when LLM unavailable
+        circuit_breaker: Monitors LLM failures and switches to fallback
         config: Configuration dictionary
         conversation_context: Dialogue state tracking
-        intent_patterns: Regular expression patterns for intent classification
+        use_llm: Whether to attempt LLM parsing
+        enable_cache: Whether to cache common patterns
+        parse_cache: Cache of recent parse results
     """
     
-    def __init__(self, perception_subsystem, config: Optional[Dict] = None):
+    def __init__(
+        self, 
+        perception_subsystem, 
+        llm_client: Optional[LLMClient] = None,
+        config: Optional[Dict] = None
+    ):
         """
         Initialize the language input parser.
         
         Args:
             perception_subsystem: PerceptionSubsystem instance for text encoding
-            config: Optional configuration dictionary
+            llm_client: Optional LLM client for intelligent parsing
+            config: Optional configuration dictionary with keys:
+                - use_fallback_on_error: Use fallback when LLM fails (default: True)
+                - max_retries: Maximum retry attempts for LLM (default: 2)
+                - timeout: Parse timeout in seconds (default: 5.0)
+                - enable_cache: Cache common patterns (default: True)
         """
         self.perception = perception_subsystem
+        self.llm_client = llm_client
         self.config = config or {}
+        
+        # Initialize fallback parser
+        self.fallback_parser = FallbackInputParser(config)
+        
+        # Get circuit breaker
+        self.circuit_breaker = get_input_circuit_breaker()
+        
+        # Configuration
+        self.use_fallback_on_error = self.config.get("use_fallback_on_error", True)
+        self.max_retries = self.config.get("max_retries", 2)
+        self.timeout = self.config.get("timeout", 5.0)
+        self.enable_cache = self.config.get("enable_cache", True)
+        
+        # Parse cache for common patterns
+        self.parse_cache: Dict[str, Dict] = {}
+        self.cache_size_limit = 100
         
         # Context tracking across conversation turns
         self.conversation_context = {
@@ -139,10 +186,11 @@ class LanguageInputParser:
             "user_name": None
         }
         
-        # Load intent classification patterns
+        # Load intent classification patterns (for fallback)
         self._load_intent_patterns()
         
-        logger.info("✅ LanguageInputParser initialized")
+        use_llm = "with LLM" if llm_client else "fallback-only"
+        logger.info(f"✅ LanguageInputParser initialized ({use_llm})")
     
     def _load_intent_patterns(self):
         """Define regular expression patterns for intent classification."""
@@ -176,6 +224,9 @@ class LanguageInputParser:
         structured Goals, Percepts, Intent, and entities that can be processed
         by the cognitive core.
         
+        Attempts LLM-powered parsing first (if available), with automatic
+        fallback to rule-based parsing on failure or when circuit breaker is open.
+        
         Args:
             text: User input text to parse
             context: Optional additional context to merge
@@ -188,24 +239,243 @@ class LanguageInputParser:
             self.conversation_context.update(context)
         self.conversation_context["turn_count"] += 1
         
-        # Classify intent
-        intent = self._classify_intent(text)
+        # Check cache first
+        if self.enable_cache and text in self.parse_cache:
+            logger.debug(f"🔍 Using cached parse result for: {text[:50]}")
+            cached_result = self.parse_cache[text]
+            return await self._build_parse_result(text, cached_result)
+        
+        # Try LLM parsing if available and circuit breaker allows
+        if self.llm_client and self.circuit_breaker.can_attempt():
+            try:
+                parse_data = await self._parse_with_llm(text)
+                self.circuit_breaker.record_success()
+                
+                # Cache successful parse
+                if self.enable_cache:
+                    self._add_to_cache(text, parse_data)
+                
+                return await self._build_parse_result(text, parse_data)
+                
+            except Exception as e:
+                logger.warning(f"LLM parsing failed: {e}")
+                self.circuit_breaker.record_failure()
+                
+                if not self.use_fallback_on_error:
+                    raise
+        
+        # Fallback to rule-based parsing
+        logger.debug("Using fallback rule-based parsing")
+        parse_data = self.fallback_parser.parse(text, self.conversation_context)
+        
+        return await self._build_parse_result(text, parse_data)
+    
+    async def _parse_with_llm(self, text: str) -> Dict:
+        """
+        Parse input using LLM with structured output.
+        
+        Args:
+            text: User input text
+            
+        Returns:
+            Dictionary with parsed components
+            
+        Raises:
+            LLMError: If parsing fails after retries
+        """
+        # Build conversation context for LLM
+        conv_context = ConversationContext(
+            turn_count=self.conversation_context["turn_count"],
+            recent_topics=self.conversation_context.get("recent_topics", []),
+            user_name=self.conversation_context.get("user_name")
+        )
+        
+        # Create structured request
+        request = LLMInputParseRequest(
+            user_text=text,
+            conversation_context=conv_context
+        )
+        
+        # Build prompt for LLM
+        prompt = self._build_llm_prompt(request)
+        
+        # Define expected schema
+        schema = {
+            "intent": {"type": "str", "confidence": "float"},
+            "goals": "list[dict]",
+            "entities": "dict",
+            "context_updates": "dict",
+            "confidence": "float"
+        }
+        
+        # Retry logic with exponential backoff
+        last_error = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                # Call LLM with timeout
+                result = await asyncio.wait_for(
+                    self.llm_client.generate_structured(prompt, schema),
+                    timeout=self.timeout
+                )
+                
+                # Validate and return
+                return self._validate_llm_response(result)
+                
+            except asyncio.TimeoutError:
+                last_error = "Timeout"
+                logger.warning(f"LLM parse timeout (attempt {attempt + 1}/{self.max_retries + 1})")
+                if attempt < self.max_retries:
+                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+            except LLMError as e:
+                last_error = str(e)
+                logger.warning(f"LLM parse error (attempt {attempt + 1}/{self.max_retries + 1}): {e}")
+                if attempt < self.max_retries:
+                    await asyncio.sleep(2 ** attempt)
+        
+        # All retries exhausted
+        raise LLMError(f"LLM parsing failed after {self.max_retries + 1} attempts: {last_error}")
+    
+    def _build_llm_prompt(self, request: LLMInputParseRequest) -> str:
+        """
+        Build prompt for LLM input parsing.
+        
+        Args:
+            request: Structured parse request
+            
+        Returns:
+            Formatted prompt string
+        """
+        prompt = f"""You are a natural language understanding system that parses user input into structured cognitive components.
+
+USER INPUT: {request.user_text}
+
+CONVERSATION CONTEXT:
+- Turn: {request.conversation_context.turn_count if request.conversation_context else 0}
+- Recent topics: {', '.join(request.conversation_context.recent_topics if request.conversation_context else [])}
+
+Parse this input and extract:
+1. Intent type (question, request, statement, greeting, introspection_request, memory_request)
+2. Goals to pursue (respond_to_user, retrieve_memory, introspect, etc.)
+3. Entities (topics, temporal references, emotional tone, names)
+4. Any context updates
+
+Respond with JSON in this format:
+{{
+    "intent": {{
+        "type": "question|request|statement|greeting|introspection_request|memory_request",
+        "confidence": 0.0-1.0,
+        "metadata": {{}}
+    }},
+    "goals": [
+        {{
+            "type": "respond_to_user|retrieve_memory|introspect|explore|maintain|other",
+            "description": "Brief goal description",
+            "priority": 0.0-1.0,
+            "metadata": {{}}
+        }}
+    ],
+    "entities": {{
+        "topics": ["topic1", "topic2"],
+        "temporal": ["time references"],
+        "emotional_tone": "positive|negative|neutral",
+        "names": ["extracted names"],
+        "other": {{}}
+    }},
+    "context_updates": {{}},
+    "confidence": 0.0-1.0
+}}
+
+JSON Response:"""
+        
+        return prompt
+    
+    def _validate_llm_response(self, response: Dict) -> Dict:
+        """
+        Validate and sanitize LLM response.
+        
+        Args:
+            response: Raw LLM response dictionary
+            
+        Returns:
+            Validated response
+            
+        Raises:
+            LLMError: If response invalid
+        """
+        # Check required fields
+        required_fields = ["intent", "goals", "entities"]
+        for field in required_fields:
+            if field not in response:
+                raise LLMError(f"Missing required field: {field}")
+        
+        # Validate intent
+        if "type" not in response["intent"]:
+            raise LLMError("Intent missing 'type' field")
+        
+        # Ensure at least one goal
+        if not response.get("goals"):
+            response["goals"] = [{
+                "type": "respond_to_user",
+                "description": "Respond to user",
+                "priority": 0.9,
+                "metadata": {}
+            }]
+        
+        # Add defaults
+        response.setdefault("context_updates", {})
+        response.setdefault("confidence", 0.9)
+        
+        return response
+    
+    def _add_to_cache(self, text: str, parse_data: Dict):
+        """Add parse result to cache with size limit."""
+        if len(self.parse_cache) >= self.cache_size_limit:
+            # Remove oldest entry (simple FIFO)
+            first_key = next(iter(self.parse_cache))
+            del self.parse_cache[first_key]
+        
+        self.parse_cache[text] = parse_data
+    
+    async def _build_parse_result(self, text: str, parse_data: Dict) -> ParseResult:
+        """
+        Build ParseResult from parse data.
+        
+        Args:
+            text: Original input text
+            parse_data: Parsed components dictionary
+            
+        Returns:
+            Complete ParseResult object
+        """
+        # Extract intent
+        intent_data = parse_data["intent"]
+        intent = Intent(
+            type=IntentType(intent_data["type"]),
+            confidence=intent_data.get("confidence", 0.8),
+            metadata=intent_data.get("metadata", {})
+        )
         
         # Extract entities
-        entities = self._extract_entities(text)
+        entities = parse_data.get("entities", {})
         
-        # Generate goals based on intent
-        goals = self._generate_goals(text, intent, entities)
+        # Generate goals
+        goals = self._parse_goals(parse_data.get("goals", []), text, intent)
         
         # Create percept for workspace
         percept = await self._create_percept(text, intent, entities)
         
         # Update topic tracking
-        if entities.get("topic"):
-            self.conversation_context["recent_topics"].append(entities["topic"])
+        if entities.get("topics"):
+            for topic in entities["topics"]:
+                if topic not in self.conversation_context["recent_topics"]:
+                    self.conversation_context["recent_topics"].append(topic)
             # Keep only last 5 topics
             self.conversation_context["recent_topics"] = \
                 self.conversation_context["recent_topics"][-5:]
+        
+        # Apply context updates
+        context_updates = parse_data.get("context_updates", {})
+        self.conversation_context.update(context_updates)
         
         result = ParseResult(
             goals=goals,
@@ -219,6 +489,53 @@ class LanguageInputParser:
                    f"goals={len(goals)}, entities={list(entities.keys())}")
         
         return result
+    
+    def _parse_goals(self, goals_data: List[Dict], text: str, intent: Intent) -> List[Goal]:
+        """
+        Convert goals data to Goal objects.
+        
+        Args:
+            goals_data: List of goal dictionaries
+            text: Original input text
+            intent: Classified intent
+            
+        Returns:
+            List of Goal objects
+        """
+        goals = []
+        
+        goal_type_mapping = {
+            "respond_to_user": GoalType.RESPOND_TO_USER,
+            "retrieve_memory": GoalType.RETRIEVE_MEMORY,
+            "introspect": GoalType.INTROSPECT,
+            "learn": GoalType.LEARN,
+            "create": GoalType.CREATE,
+            "other": GoalType.RESPOND_TO_USER  # Map other to respond_to_user
+        }
+        
+        for goal_data in goals_data:
+            goal_type_str = goal_data.get("type", "other")
+            goal_type = goal_type_mapping.get(goal_type_str, GoalType.RESPOND_TO_USER)
+            
+            goals.append(Goal(
+                type=goal_type,
+                description=goal_data.get("description", "Process user input"),
+                priority=goal_data.get("priority", 0.8),
+                progress=0.0,
+                metadata=goal_data.get("metadata", {})
+            ))
+        
+        # Ensure at least one goal exists
+        if not goals:
+            goals.append(Goal(
+                type=GoalType.RESPOND_TO_USER,
+                description=f"Respond to user {intent.type}",
+                priority=0.9,
+                progress=0.0,
+                metadata={"intent": intent.type, "user_input": text[:100]}
+            ))
+        
+        return goals
     
     def _classify_intent(self, text: str) -> Intent:
         """

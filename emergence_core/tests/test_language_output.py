@@ -14,10 +14,6 @@ import asyncio
 from pathlib import Path
 from unittest.mock import Mock, AsyncMock, patch
 
-# Mock pydantic to avoid import errors
-import sys
-sys.modules['pydantic'] = Mock()
-
 from lyra.cognitive_core.language_output import LanguageOutputGenerator
 from lyra.cognitive_core.workspace import WorkspaceSnapshot, Percept, Goal, GoalType
 

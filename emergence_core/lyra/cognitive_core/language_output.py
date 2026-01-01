@@ -12,16 +12,21 @@ The language output generator is responsible for:
 - Generating emotion-influenced language style
 - Formatting and cleaning LLM responses
 - Providing natural language as the output of cognitive processing
+- Fallback to template-based generation when LLM unavailable
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Dict, Any, Optional
 from pathlib import Path
 from datetime import datetime
 
 from .workspace import WorkspaceSnapshot, Percept
+from .llm_client import LLMClient, LLMError
+from .fallback_handlers import FallbackOutputGenerator, get_output_circuit_breaker
+from .structured_formats import workspace_snapshot_to_dict
 
 logger = logging.getLogger(__name__)
 
@@ -41,12 +46,14 @@ class LanguageOutputGenerator:
     - Apply emotion-influenced language styling
     - Format and clean LLM outputs
     - Provide contextual, authentic responses
+    - Fallback to template-based generation when LLM fails
     
     Integration Points:
     - GlobalWorkspace: Reads workspace snapshots for generation context
-    - LLM Client: Uses existing LLM infrastructure (RouterModel or similar)
+    - LLMClient: Uses LLM for natural language generation
     - Identity Files: Loads charter and protocols for identity-aligned responses
     - CognitiveCore: Called during SPEAK action execution
+    - FallbackOutputGenerator: Provides template-based fallback
     
     Design Philosophy:
     This is a PERIPHERAL component that converts non-linguistic cognitive
@@ -55,11 +62,15 @@ class LanguageOutputGenerator:
     
     Attributes:
         llm: LLM client for text generation
+        fallback_generator: Template-based generator for LLM failures
+        circuit_breaker: Monitors LLM failures and switches to fallback
         config: Configuration dictionary
         charter_text: Loaded charter content
         protocols_text: Loaded protocols content
         temperature: LLM generation temperature
         max_tokens: Maximum tokens to generate
+        use_fallback_on_error: Whether to use fallback on LLM failure
+        timeout: Generation timeout in seconds
     """
     
     def __init__(self, llm_client, config: Optional[Dict] = None):
@@ -72,9 +83,23 @@ class LanguageOutputGenerator:
                 - temperature: Generation temperature (default: 0.7)
                 - max_tokens: Max tokens to generate (default: 500)
                 - identity_dir: Path to identity files (default: "data/identity")
+                - use_fallback_on_error: Use fallback on LLM failure (default: True)
+                - timeout: Generation timeout in seconds (default: 10.0)
+                - emotional_style_modulation: Apply emotion-based styling (default: True)
         """
         self.llm = llm_client
         self.config = config or {}
+        
+        # Initialize fallback generator
+        self.fallback_generator = FallbackOutputGenerator(config)
+        
+        # Get circuit breaker
+        self.circuit_breaker = get_output_circuit_breaker()
+        
+        # Configuration
+        self.use_fallback_on_error = self.config.get("use_fallback_on_error", True)
+        self.timeout = self.config.get("timeout", 10.0)
+        self.emotional_style_modulation = self.config.get("emotional_style_modulation", True)
         
         # Load identity
         self.charter_text = self._load_charter()
@@ -98,37 +123,115 @@ class LanguageOutputGenerator:
         rich prompt from the workspace snapshot, calls the LLM, and returns
         a formatted response.
         
+        Attempts LLM generation first (if available), with automatic fallback
+        to template-based generation on failure or when circuit breaker is open.
+        
         Args:
             snapshot: Current workspace snapshot with emotions, goals, percepts
             context: Optional context dict with keys like:
                 - user_input: Original user message being responded to
                 - conversation_history: Recent conversation context
+                - intent: Detected intent from input parser
                 
         Returns:
             Natural language response string
         """
         context = context or {}
         
+        # Try LLM generation if available and circuit breaker allows
+        if self.llm and self.circuit_breaker.can_attempt():
+            try:
+                response = await self._generate_with_llm(snapshot, context)
+                self.circuit_breaker.record_success()
+                
+                logger.info(f"🗣️ Generated response: {len(response)} chars")
+                return response
+                
+            except Exception as e:
+                logger.warning(f"LLM generation failed: {e}")
+                self.circuit_breaker.record_failure()
+                
+                if not self.use_fallback_on_error:
+                    raise
+        
+        # Fallback to template-based generation
+        logger.debug("Using fallback template-based generation")
+        workspace_state = workspace_snapshot_to_dict(snapshot)
+        response = self.fallback_generator.generate(workspace_state, context)
+        
+        logger.info(f"🗣️ Generated fallback response: {len(response)} chars")
+        return response
+    
+    async def _generate_with_llm(
+        self, 
+        snapshot: WorkspaceSnapshot,
+        context: Dict
+    ) -> str:
+        """
+        Generate response using LLM.
+        
+        Args:
+            snapshot: Workspace snapshot
+            context: Generation context
+            
+        Returns:
+            Generated response string
+            
+        Raises:
+            LLMError: If generation fails
+        """
         # Build prompt from workspace state
         prompt = self._build_prompt(snapshot, context)
         
-        # Call LLM
+        # Call LLM with timeout
         try:
-            response = await self.llm.generate(
-                prompt=prompt,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens
+            response = await asyncio.wait_for(
+                self.llm.generate(
+                    prompt=prompt,
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens
+                ),
+                timeout=self.timeout
             )
+        except asyncio.TimeoutError:
+            logger.error(f"LLM generation timed out after {self.timeout}s")
+            raise LLMError("Generation timeout")
         except Exception as e:
             logger.error(f"LLM generation failed: {e}")
-            # Fallback response
-            return "I'm having trouble formulating a response right now."
+            raise LLMError(f"Generation failed: {e}")
         
         # Format response
         formatted = self._format_response(response)
         
-        logger.info(f"🗣️ Generated response: {len(formatted)} chars")
-        return formatted
+        # Apply content filtering
+        filtered = self._apply_content_filter(formatted)
+        
+        return filtered
+    
+    def _apply_content_filter(self, response: str) -> str:
+        """
+        Apply content filtering and safety checks.
+        
+        Args:
+            response: Generated response
+            
+        Returns:
+            Filtered response
+        """
+        # Basic safety: Remove common harmful patterns
+        # In production, this would be more sophisticated
+        
+        # Check length
+        if len(response) < 10:
+            return "I need to think more about that."
+        
+        if len(response) > self.max_tokens * 6:  # Approximate char limit
+            response = response[:self.max_tokens * 6] + "..."
+        
+        # Remove any remaining markdown artifacts
+        response = response.replace("```", "")
+        
+        return response
     
     def _load_charter(self) -> str:
         """
