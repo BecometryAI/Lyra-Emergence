@@ -66,6 +66,6 @@ jobs:
     
     - name: Run extended property tests (1000 examples)
       run: |
-        pytest -v -m property --hypothesis-seed=0 emergence_core/tests/property_tests/ --hypothesis-profile=extended
+        pytest -v -m property --hypothesis-seed=0 emergence_core/tests/property_tests/
       env:
         HYPOTHESIS_PROFILE: extended

@@ -76,6 +76,25 @@ filterwarnings = [
     "ignore::UserWarning",
 ]
 
+[tool.hypothesis]
+derandomize = true
+print_blob = true
+
+[tool.hypothesis.profiles.default]
+max_examples = 100
+
+[tool.hypothesis.profiles.ci]
+max_examples = 100
+derandomize = true
+print_blob = true
+suppress_health_check = ["too_slow"]
+
+[tool.hypothesis.profiles.extended]
+max_examples = 1000
+derandomize = true
+print_blob = true
+suppress_health_check = ["too_slow"]
+
 [dependency-groups]
 dev = [
     "pytest>=8.4.2",
