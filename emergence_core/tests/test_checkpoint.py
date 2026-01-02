@@ -561,7 +561,8 @@ class TestCognitiveCoreIntegration:
             assert len(checkpoints) > 0
             assert any(cp.metadata.get("shutdown", False) for cp in checkpoints)
     
-    def test_enable_disable_auto_checkpoint(self):
+    @pytest.mark.asyncio
+    async def test_enable_disable_auto_checkpoint(self):
         """Test enable/disable auto-checkpoint methods."""
         with TemporaryDirectory() as tmpdir:
             config = {
@@ -577,7 +578,7 @@ class TestCognitiveCoreIntegration:
             success = core.enable_auto_checkpoint()
             assert success is False
             
-            # Simulate running state
+            # Simulate running state within async context
             core.running = True
             
             # Enable auto-checkpoint
