@@ -30,6 +30,7 @@ setup(
         "httpx>=0.28.1",
         "aiohttp>=3.13.2",
         "discord-py-interactions>=5.11.0",
+        "fastapi>=0.109.0",  # Required for API tests
         
         # Audio processing
         "soundfile>=0.13.1",
