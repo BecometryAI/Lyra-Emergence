@@ -12,7 +12,7 @@ from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 import shutil
 
-from lyra.memory_manager import MemoryManager, JournalEntry, EmotionalState
+from lyra.memory_manager import MemoryManager, JournalEntry
 from lyra.cognitive_core.memory_gc import (
     MemoryGarbageCollector,
     CollectionStats,
