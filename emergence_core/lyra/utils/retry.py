@@ -145,7 +145,13 @@ def retry_with_backoff(
                 f"All {max_retries + 1} attempts failed for {func.__name__}. "
                 f"Last error: {last_exception}"
             )
-            raise last_exception
+            if last_exception is not None:
+                raise last_exception
+            else:
+                raise RuntimeError(
+                    f"All {max_retries + 1} attempts failed for {func.__name__}, "
+                    "but no exception was captured on the final attempt."
+                )
         
         # Return appropriate wrapper based on whether function is async
         if asyncio.iscoroutinefunction(func):
