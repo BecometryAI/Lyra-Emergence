@@ -9,7 +9,6 @@ import pytest
 import tempfile
 import shutil
 from pathlib import Path
-from unittest.mock import Mock
 
 from emergence_core.lyra.cognitive_core.identity_loader import (
     IdentityLoader,
