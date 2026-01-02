@@ -310,16 +310,6 @@ class IncrementalJournalWriter:
             except Exception as e:
                 logger.error(f"❌ Error closing journal file: {e}")
     
-    def __del__(self):
-        """
-        Ensure file is closed on object destruction.
-        """
-        if self.current_file:
-            try:
-                self.current_file.close()
-            except:
-                pass
-    
     def get_stats(self) -> Dict[str, Any]:
         """
         Get statistics about journal writer.
