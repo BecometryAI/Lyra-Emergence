@@ -42,7 +42,7 @@ async def main():
     
     try:
         await lyra.start()
-        print("✅ Lyra is online. Type 'quit' to exit.\n")
+        print("✅ Lyra is online. Type 'help' for commands or 'quit' to exit.\n")
         
         while True:
             # Get user input
@@ -58,6 +58,20 @@ async def main():
             # Handle special commands
             if user_input.lower() in ["quit", "exit"]:
                 break
+            
+            if user_input.lower() in ["help", "?"]:
+                print("\n📖 Available Commands:")
+                print("   quit, exit          - Exit the CLI")
+                print("   help, ?             - Show this help message")
+                print("   reset               - Clear conversation history")
+                print("   history             - Show recent conversation")
+                print("   metrics             - Show system metrics")
+                print("   save [label]        - Save current state (optional label)")
+                print("   checkpoints         - List all available checkpoints")
+                print("   load <id>           - Load a specific checkpoint by ID")
+                print("   restore latest      - Restore from most recent checkpoint")
+                print("\n   Any other text will be sent to Lyra for conversation.\n")
+                continue
             
             if user_input.lower() == "reset":
                 lyra.reset_conversation()
@@ -92,6 +106,112 @@ async def main():
                 print(f"   Workspace size: {metrics['cognitive_core']['workspace_size']}")
                 print(f"   Current goals: {metrics['cognitive_core']['current_goals']}")
                 print()
+                continue
+            
+            # Checkpoint commands
+            if user_input.lower().startswith("save"):
+                parts = user_input.split(maxsplit=1)
+                label = parts[1] if len(parts) > 1 else None
+                path = lyra.core.save_state(label)
+                if path:
+                    print(f"💾 State saved: {path.name}\n")
+                else:
+                    print("❌ Failed to save state (checkpointing may be disabled)\n")
+                continue
+            
+            if user_input.lower() == "checkpoints":
+                if not lyra.core.checkpoint_manager:
+                    print("❌ Checkpointing is disabled\n")
+                    continue
+                
+                checkpoints = lyra.core.checkpoint_manager.list_checkpoints()
+                if not checkpoints:
+                    print("No checkpoints found.\n")
+                else:
+                    print(f"\n💾 Available Checkpoints ({len(checkpoints)}):")
+                    for i, cp in enumerate(checkpoints[:10], 1):  # Show max 10
+                        label = cp.metadata.get('user_label', 'N/A')
+                        auto = " [auto]" if cp.metadata.get('auto_save') else ""
+                        shutdown = " [shutdown]" if cp.metadata.get('shutdown') else ""
+                        size_kb = cp.size_bytes / 1024
+                        print(f"\n{i}. {cp.timestamp.strftime('%Y-%m-%d %H:%M:%S')}{auto}{shutdown}")
+                        print(f"   ID: {cp.checkpoint_id[:16]}...")
+                        print(f"   Label: {label}")
+                        print(f"   Size: {size_kb:.1f} KB")
+                    print()
+                continue
+            
+            if user_input.lower().startswith("load"):
+                if not lyra.core.checkpoint_manager:
+                    print("❌ Checkpointing is disabled\n")
+                    continue
+                
+                parts = user_input.split(maxsplit=1)
+                if len(parts) < 2:
+                    print("❌ Usage: load <checkpoint_id>\n")
+                    continue
+                
+                checkpoint_id = parts[1]
+                
+                # Find checkpoint by ID prefix
+                checkpoints = lyra.core.checkpoint_manager.list_checkpoints()
+                matching = [cp for cp in checkpoints if cp.checkpoint_id.startswith(checkpoint_id)]
+                
+                if not matching:
+                    print(f"❌ Checkpoint not found: {checkpoint_id}\n")
+                    continue
+                
+                if len(matching) > 1:
+                    print(f"❌ Ambiguous checkpoint ID (matches {len(matching)} checkpoints)\n")
+                    continue
+                
+                checkpoint = matching[0]
+                
+                # Cannot load while running - need to stop first
+                print(f"⚠️  Loading checkpoint requires restarting Lyra...")
+                print(f"💾 Stopping Lyra...")
+                await lyra.stop()
+                
+                # Restore state
+                success = lyra.core.restore_state(checkpoint.path)
+                if success:
+                    print(f"✅ State restored from {checkpoint.timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
+                    print(f"🧠 Restarting Lyra...")
+                    await lyra.start()
+                    print("✅ Lyra is online.\n")
+                else:
+                    print("❌ Failed to restore state")
+                    print("🧠 Restarting Lyra with original state...")
+                    await lyra.start()
+                    print("✅ Lyra is online.\n")
+                continue
+            
+            if user_input.lower() == "restore latest":
+                if not lyra.core.checkpoint_manager:
+                    print("❌ Checkpointing is disabled\n")
+                    continue
+                
+                latest = lyra.core.checkpoint_manager.get_latest_checkpoint()
+                if not latest:
+                    print("❌ No checkpoints found\n")
+                    continue
+                
+                print(f"⚠️  Loading checkpoint requires restarting Lyra...")
+                print(f"💾 Stopping Lyra...")
+                await lyra.stop()
+                
+                # Restore state
+                success = lyra.core.restore_state(latest)
+                if success:
+                    print(f"✅ State restored from latest checkpoint")
+                    print(f"🧠 Restarting Lyra...")
+                    await lyra.start()
+                    print("✅ Lyra is online.\n")
+                else:
+                    print("❌ Failed to restore state")
+                    print("🧠 Restarting Lyra with original state...")
+                    await lyra.start()
+                    print("✅ Lyra is online.\n")
                 continue
             
             # Process turn
