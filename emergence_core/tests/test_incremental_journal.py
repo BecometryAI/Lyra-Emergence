@@ -16,7 +16,6 @@ import json
 import gzip
 import tempfile
 import threading
-import time
 from pathlib import Path
 from datetime import datetime, timedelta
 
