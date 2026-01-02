@@ -550,7 +550,6 @@ class TestCognitiveCoreIntegration:
             core.workspace.add_goal(goal)
             
             # Simulate shutdown (without actually running the loop)
-            checkpoint_dir = Path(tmpdir) / "checkpoints"
             manager = core.checkpoint_manager
             manager.save_checkpoint(
                 core.workspace,
