@@ -50,11 +50,16 @@ class ChromaDBTransaction:
     def __enter__(self):
         """Enter transaction context."""
         # Create checkpoint by recording current IDs
+        # Note: For large collections, this could be expensive. Consider implementing
+        # operation-only tracking or sampling for production use with millions of documents.
         try:
             with OperationContext(operation="transaction_start", collection=self.collection.name):
                 result = self.collection.get()
                 self._checkpoint_ids = set(result.get('ids', []))
-                logger.debug(f"Transaction started for collection '{self.collection.name}'")
+                logger.debug(
+                    f"Transaction started for collection '{self.collection.name}' "
+                    f"({len(self._checkpoint_ids)} existing documents)"
+                )
         except Exception as e:
             logger.error(f"Failed to create transaction checkpoint: {e}")
             raise MemoryError(

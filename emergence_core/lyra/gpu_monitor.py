@@ -237,14 +237,20 @@ class GPUMonitor:
             model: Model object
             device_id: GPU device ID where model is loaded
             estimated_size_mb: Optional estimated size, calculated if not provided
+        
+        Note:
+            If estimated_size_mb is not provided, the current GPU memory allocation
+            will be used as an approximation. For accurate tracking, measure memory
+            before and after model loading and pass the difference as estimated_size_mb.
         """
         with self._lock:
             # Calculate model size if not provided
+            # Note: This is an approximation - total allocated memory on device
+            # For precise tracking, measure memory before/after model load
             if estimated_size_mb is None and self.cuda_available:
                 try:
-                    before = torch.cuda.memory_allocated(device_id)
-                    # Model should already be loaded, so just check current allocation
-                    estimated_size_mb = before / (1024 ** 2)
+                    # Use current allocated memory as approximation
+                    estimated_size_mb = torch.cuda.memory_allocated(device_id) / (1024 ** 2)
                 except Exception as e:
                     logger.warning(f"Could not estimate model size: {e}")
                     estimated_size_mb = 0.0

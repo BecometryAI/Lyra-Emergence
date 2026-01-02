@@ -10,6 +10,7 @@ Date: January 2, 2026
 
 import asyncio
 import time
+import threading
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Dict, Optional
@@ -76,8 +77,9 @@ class RateLimiter:
         # Calculate refill rate (tokens per second)
         self.refill_rate = calls_per_minute / 60.0
         
-        # Lock for thread safety
-        self._lock = asyncio.Lock()
+        # Locks for thread safety (both sync and async)
+        self._sync_lock = threading.Lock()
+        self._async_lock = asyncio.Lock()
         
         logger.info(
             f"Rate limiter initialized: {calls_per_minute} calls/min, "
@@ -109,7 +111,7 @@ class RateLimiter:
         """
         start_time = time.time()
         
-        async with self._lock:
+        async with self._async_lock:
             while True:
                 self._refill_tokens()
                 
@@ -144,24 +146,27 @@ class RateLimiter:
         """
         start_time = time.time()
         
-        while True:
-            self._refill_tokens()
-            
-            if self.tokens >= 1.0:
-                self.tokens -= 1.0
-                return True
-            
-            # Check timeout
-            elapsed = time.time() - start_time
-            if elapsed >= timeout:
-                raise RateLimitError(
-                    f"Rate limit timeout after {timeout}s",
-                    retry_after=1.0 / self.refill_rate
-                )
-            
-            # Wait for next token
-            wait_time = min(1.0 / self.refill_rate, timeout - elapsed)
-            time.sleep(wait_time)
+        with self._sync_lock:
+            while True:
+                self._refill_tokens()
+                
+                if self.tokens >= 1.0:
+                    self.tokens -= 1.0
+                    return True
+                
+                # Check timeout
+                elapsed = time.time() - start_time
+                if elapsed >= timeout:
+                    raise RateLimitError(
+                        f"Rate limit timeout after {timeout}s",
+                        retry_after=1.0 / self.refill_rate
+                    )
+                
+                # Release lock while waiting to allow other threads
+                self._sync_lock.release()
+                wait_time = min(1.0 / self.refill_rate, timeout - elapsed)
+                time.sleep(wait_time)
+                self._sync_lock.acquire()
     
     def try_acquire(self) -> bool:
         """
@@ -170,13 +175,14 @@ class RateLimiter:
         Returns:
             True if token acquired, False otherwise
         """
-        self._refill_tokens()
-        
-        if self.tokens >= 1.0:
-            self.tokens -= 1.0
-            return True
-        
-        return False
+        with self._sync_lock:
+            self._refill_tokens()
+            
+            if self.tokens >= 1.0:
+                self.tokens -= 1.0
+                return True
+            
+            return False
     
     def get_available_tokens(self) -> float:
         """
@@ -185,8 +191,9 @@ class RateLimiter:
         Returns:
             Number of tokens currently available
         """
-        self._refill_tokens()
-        return self.tokens
+        with self._sync_lock:
+            self._refill_tokens()
+            return self.tokens
 
 
 class ServiceRateLimiter:

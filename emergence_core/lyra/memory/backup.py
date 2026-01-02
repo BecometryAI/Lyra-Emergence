@@ -11,6 +11,7 @@ import asyncio
 import logging
 import shutil
 import tarfile
+import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional, Dict, Any
@@ -290,28 +291,29 @@ class BackupManager:
         """Restore from compressed backup."""
         def _extract_tar():
             with tarfile.open(backup_path, "r:gz") as tar:
-                # Extract to temporary directory first
-                temp_dir = target_dir.parent / f".restore_temp_{datetime.utcnow().timestamp()}"
-                tar.extractall(temp_dir)
-                
-                # Move contents to target
-                extracted = list(temp_dir.iterdir())
-                if len(extracted) == 1 and extracted[0].is_dir():
-                    # Backup has a root directory
-                    source = extracted[0]
-                else:
-                    source = temp_dir
-                
-                # Remove target if exists
-                if target_dir.exists():
-                    shutil.rmtree(target_dir)
-                
-                # Move to target
-                shutil.move(str(source), str(target_dir))
-                
-                # Cleanup temp
-                if temp_dir.exists():
-                    shutil.rmtree(temp_dir)
+                # Extract to temporary directory first (using secure temp directory)
+                temp_dir = Path(tempfile.mkdtemp(prefix="lyra_restore_"))
+                try:
+                    tar.extractall(temp_dir)
+                    
+                    # Move contents to target
+                    extracted = list(temp_dir.iterdir())
+                    if len(extracted) == 1 and extracted[0].is_dir():
+                        # Backup has a root directory
+                        source = extracted[0]
+                    else:
+                        source = temp_dir
+                    
+                    # Remove target if exists
+                    if target_dir.exists():
+                        shutil.rmtree(target_dir)
+                    
+                    # Move to target
+                    shutil.move(str(source), str(target_dir))
+                finally:
+                    # Cleanup temp
+                    if temp_dir.exists():
+                        shutil.rmtree(temp_dir)
         
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, _extract_tar)
