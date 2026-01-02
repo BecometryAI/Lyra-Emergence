@@ -692,6 +692,126 @@ pytest emergence_core/tests/test_language_input.py
 
 # Run consciousness tests
 pytest emergence_core/tests/test_consciousness_tests.py
+
+# Run checkpoint tests
+pytest emergence_core/tests/test_checkpoint.py
+```
+
+### Workspace State Checkpointing
+
+Lyra-Emergence includes comprehensive workspace state checkpointing for session continuity and recovery:
+
+#### Features
+
+- **Manual Checkpoints**: Save workspace state at critical points
+- **Automatic Periodic Checkpoints**: Background auto-save at configurable intervals
+- **Session Recovery**: Restore from checkpoint after crashes or interruptions
+- **Experimentation Support**: Save before risky changes, restore if needed
+- **Checkpoint Management**: List, load, and delete checkpoints
+- **Compression**: gzip compression for efficient storage
+- **Atomic Writes**: Prevents corruption during save operations
+- **Checkpoint Rotation**: Automatic cleanup to prevent unbounded disk usage
+
+#### Configuration
+
+Configure checkpointing in your CognitiveCore config:
+
+```python
+config = {
+    "checkpointing": {
+        "enabled": True,
+        "auto_save": True,
+        "auto_save_interval": 300.0,  # 5 minutes
+        "checkpoint_dir": "data/checkpoints/",
+        "max_checkpoints": 20,
+        "compression": True,
+        "checkpoint_on_shutdown": True,
+    }
+}
+
+core = CognitiveCore(config=config)
+```
+
+#### CLI Commands
+
+When using the Lyra CLI (`python -m lyra.cli`), checkpointing commands are available:
+
+```bash
+# Save current state with optional label
+save [label]
+
+# List all available checkpoints
+checkpoints
+
+# Load a specific checkpoint by ID
+load <checkpoint_id>
+
+# Restore from most recent checkpoint
+restore latest
+
+# Show all commands
+help
+```
+
+#### Programmatic Usage
+
+```python
+from emergence_core.lyra.cognitive_core import CognitiveCore
+
+# Create cognitive core with checkpointing
+core = CognitiveCore(config={"checkpointing": {"enabled": True}})
+
+# Manual save with label
+checkpoint_path = core.save_state(label="Before experiment")
+
+# Restore from checkpoint (when not running)
+success = core.restore_state(checkpoint_path)
+
+# Enable auto-checkpointing (when running)
+await core.start()
+core.enable_auto_checkpoint(interval=300.0)  # Every 5 minutes
+
+# Disable auto-checkpointing
+core.disable_auto_checkpoint()
+
+# Start with automatic restore from latest checkpoint
+await core.start(restore_latest=True)
+```
+
+#### Demo Script
+
+Run the checkpoint demo to see all features in action:
+
+```bash
+# Full demo (requires running cognitive loop)
+python scripts/demo_checkpointing.py
+
+# Simplified demo (no cognitive loop dependencies)
+python scripts/demo_checkpointing_simple.py
+```
+
+#### Checkpoint File Format
+
+Checkpoints are stored as JSON (optionally gzip-compressed):
+
+```json
+{
+    "version": "1.0",
+    "timestamp": "2026-01-02T12:34:56Z",
+    "checkpoint_id": "uuid-string",
+    "workspace_state": {
+        "goals": [...],
+        "percepts": {...},
+        "emotions": {...},
+        "memories": [...],
+        "cycle_count": 12345
+    },
+    "metadata": {
+        "user_label": "Before important conversation",
+        "auto_save": false,
+        "shutdown": false
+    }
+}
 ```
 
 ### Notes on Deprecated Files
