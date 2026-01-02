@@ -32,7 +32,6 @@ import hashlib
 import json
 import logging
 import asyncio
-import shutil
 import uuid
 from datetime import datetime
 from pathlib import Path
