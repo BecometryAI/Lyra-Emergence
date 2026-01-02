@@ -148,9 +148,10 @@ def emotional_states(draw):
 
 
 # Strategy for generating lists of percepts/goals with realistic sizes
-percept_lists = st.lists(percepts(), min_size=0, max_size=50)
+# Reduced max sizes to prevent Hypothesis FailedHealthCheck due to excessive entropy
+percept_lists = st.lists(percepts(), min_size=0, max_size=20)
 goal_lists = st.lists(goals(), min_size=0, max_size=10)
-memory_lists = st.lists(memories(), min_size=0, max_size=20)
+memory_lists = st.lists(memories(), min_size=0, max_size=10)
 
 
 # Helper function for creating unique items

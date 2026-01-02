@@ -9,7 +9,7 @@ Tests cover:
 """
 
 import pytest
-from hypothesis import given, settings, assume
+from hypothesis import given, settings, assume, HealthCheck
 from hypothesis import strategies as st
 from datetime import datetime
 
@@ -69,7 +69,7 @@ class TestMemoryProperties:
         assert len(unique_memories) <= len(memories_list)
     
     @given(memory_lists)
-    @settings(max_examples=50)
+    @settings(max_examples=50, suppress_health_check=[HealthCheck.data_too_large])
     def test_memory_timestamp_ordering(self, memories_list):
         """Property: Memories can be sorted by timestamp."""
         assume(len(memories_list) >= 2)

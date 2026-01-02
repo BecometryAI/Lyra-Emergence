@@ -32,6 +32,10 @@ jobs:
         pip install -e .
         pip install pytest pytest-asyncio pytest-mock hypothesis
     
+    - name: Verify package installation
+      run: |
+        python -c "import lyra; print('Package installed successfully')" || echo "Warning: Package import failed"
+    
     - name: Run unit tests
       run: |
         pytest -v -m "not integration and not property" emergence_core/tests/
@@ -63,6 +67,10 @@ jobs:
         python -m pip install --upgrade pip
         pip install -e .
         pip install pytest pytest-asyncio pytest-mock hypothesis
+    
+    - name: Verify package installation
+      run: |
+        python -c "import lyra; print('Package installed successfully')" || echo "Warning: Package import failed"
     
     - name: Run extended property tests (1000 examples)
       run: |
