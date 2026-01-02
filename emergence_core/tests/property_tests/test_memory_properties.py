@@ -11,7 +11,7 @@ Tests cover:
 import pytest
 from hypothesis import given, settings, assume
 from hypothesis import strategies as st
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from lyra.cognitive_core.workspace import Memory
 from .strategies import (
