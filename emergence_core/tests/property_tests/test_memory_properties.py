@@ -36,8 +36,9 @@ class TestMemoryProperties:
     def test_memory_has_valid_timestamp(self, memory):
         """Property: Memory timestamp is valid and is a datetime object."""
         assert isinstance(memory.timestamp, datetime)
-        # Timestamp should be within reasonable bounds (2024-2025)
-        assert datetime(2024, 1, 1) <= memory.timestamp <= datetime(2026, 1, 1)
+        # Timestamp should be within expected bounds
+        # (Strategies use fixed 2024-2025 range for deterministic generation)
+        assert datetime(2024, 1, 1) <= memory.timestamp <= datetime(2025, 12, 31)
     
     @given(memories())
     @settings(max_examples=100)

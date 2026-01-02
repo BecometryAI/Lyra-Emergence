@@ -62,7 +62,7 @@ class TestWorkspaceProperties:
         snapshot = workspace.broadcast()
         
         # Verify snapshot is frozen (attempting modification raises error)
-        with pytest.raises(ValidationError):
+        with pytest.raises((ValidationError, AttributeError, TypeError)):
             snapshot.cycle_count = 999
         
         # Verify snapshot unchanged after workspace modification

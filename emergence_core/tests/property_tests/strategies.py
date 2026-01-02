@@ -102,8 +102,14 @@ def memories(draw):
         
     Returns:
         Memory: A valid Memory instance
+        
+    Note:
+        Uses fixed date range (2024-2025) instead of datetime.now() to ensure
+        deterministic test generation. Hypothesis requires strategies to be
+        deterministic across runs for proper shrinking and caching.
     """
-    # Use fixed date range instead of datetime.now() for deterministic generation
+    # Use fixed date range for deterministic generation
+    # (Hypothesis requirement for proper test caching and shrinking)
     min_date = datetime(2024, 1, 1)
     max_date = datetime(2025, 12, 31)
     timestamp = draw(st.datetimes(

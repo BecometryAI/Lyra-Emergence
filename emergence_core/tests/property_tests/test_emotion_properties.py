@@ -229,7 +229,18 @@ class TestEmotionProperties:
     def test_affect_subsystem_update_deterministic(self, percepts_list, goals_list):
         """Property: Same input produces same emotional update."""
         # Create two affect subsystems with same config
-        config = {"decay_rate": 0.05, "sensitivity": 0.3, "baseline": {"valence": 0.1, "arousal": 0.3, "dominance": 0.6}}
+        # Config values: decay_rate controls return to baseline speed (5% per cycle)
+        #                sensitivity controls response magnitude to stimuli (30%)
+        #                baseline defines neutral emotional state
+        config = {
+            "decay_rate": 0.05,  # 5% decay per cycle
+            "sensitivity": 0.3,  # 30% sensitivity to stimuli
+            "baseline": {
+                "valence": 0.1,    # Slightly positive baseline
+                "arousal": 0.3,    # Mild activation baseline
+                "dominance": 0.6   # Moderate control baseline
+            }
+        }
         affect1 = AffectSubsystem(config=config)
         affect2 = AffectSubsystem(config=config)
         

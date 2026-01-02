@@ -64,7 +64,13 @@ class TestAttentionProperties:
     @given(percept_lists)
     @settings(max_examples=100)
     def test_attention_score_non_negative(self, percepts_list):
-        """Property: All attention scores are non-negative."""
+        """
+        Property: All attention scores are non-negative.
+        
+        Note: Tests private _score() method to validate mathematical invariant.
+        This is acceptable for property tests as it verifies a core constraint
+        that must hold regardless of implementation changes.
+        """
         assume(len(percepts_list) > 0)
         
         workspace = GlobalWorkspace()
@@ -114,7 +120,13 @@ class TestAttentionProperties:
     @given(st.lists(percepts(), min_size=3, max_size=15), st.integers(min_value=5, max_value=100))
     @settings(max_examples=50, deadline=None, suppress_health_check=[HealthCheck.data_too_large])
     def test_attention_budget_allocation(self, percepts_list, budget):
-        """Property: Controller attempts to maximize use of attention budget."""
+        """
+        Property: Controller attempts to maximize use of attention budget.
+        
+        Note: Data size check suppressed because percept generation with embeddings
+        naturally produces larger data. List size limited to 15 to balance coverage
+        and performance.
+        """
         assume(len(percepts_list) >= 3)
         
         workspace = GlobalWorkspace()
