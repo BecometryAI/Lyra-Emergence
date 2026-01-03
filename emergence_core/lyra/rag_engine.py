@@ -29,15 +29,15 @@ except ImportError:
     from langchain.vectorstores import Chroma
 
 try:
-    # Try newer LangChain import structure (0.2.0+) - chains moved to langchain package
+    # Try main langchain.chains import (works in most versions)
     from langchain.chains import RetrievalQA
-except ImportError:
+except (ImportError, ModuleNotFoundError):
     try:
-        # Try older structure with specific module
+        # Try specific module path
         from langchain.chains.retrieval_qa import RetrievalQA
-    except ImportError:
-        # Ultimate fallback
-        from langchain.chains import RetrievalQA
+    except (ImportError, ModuleNotFoundError):
+        # Set to None and handle gracefully
+        RetrievalQA = None
 
 try:
     # Try newer LangChain import structure (0.1.0+)

@@ -14,7 +14,7 @@ setup(
         "torch>=2.9.0",
         "transformers>=4.57.1",
         "sentence-transformers>=5.1.2",
-        "langchain>=0.1.0",
+        "langchain>=0.1.0,<0.3.0",  # Main LangChain package with chains module
         "langchain-core>=0.1.0",  # Required for Document import in newer LangChain versions
         "langchain-text-splitters>=0.0.1",  # Required for text splitting in newer LangChain versions
         "langchain-community>=0.0.1",  # Required for vectorstore and other community integrations
