@@ -10,7 +10,7 @@ setup(
     package_dir={"": "emergence_core"},
     install_requires=[
         # Core ML dependencies
-        "numpy>=2.3.4",
+        "numpy>=1.26.0,<2.0.0",  # Constrained to <2.0.0 for langchain compatibility
         "torch>=2.9.0",
         "transformers>=4.57.1",
         "sentence-transformers>=5.1.2",
