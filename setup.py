@@ -6,7 +6,7 @@ from setuptools import setup, find_packages
 setup(
     name="lyra-emergence",
     version="0.1.0",
-    packages=find_packages(),
+    packages=find_packages(where="emergence_core"),
     package_dir={"": "emergence_core"},
     install_requires=[
         # Core ML dependencies
@@ -32,13 +32,14 @@ setup(
         "hypercorn>=0.16.0",
         "httpx>=0.28.1",
         "aiohttp>=3.13.2",
-        "discord-py-interactions>=5.11.0",
+        "discord.py>=2.0.0",
         "fastapi>=0.109.0",  # Required for API tests
         
         # Audio processing
         "soundfile>=0.13.1",
         "librosa>=0.11.0",
         "scipy>=1.16.3",
+        "torchaudio>=2.9.0",
         
         # Blockchain and storage
         "web3[async]>=6.0.0",
