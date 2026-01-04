@@ -59,6 +59,9 @@ dependencies = [
     # Utilities
     "python-dotenv>=1.2.1",
     "pydantic>=2.12.4",
+    
+    # Testing
+    "hypothesis>=6.100.0",
 ]
 
 [tool.pytest.ini_options]
@@ -68,6 +71,7 @@ python_files = ["test_*.py"]
 addopts = "-v --tb=short"
 markers = [
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+    "property: Property-based tests using Hypothesis",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",
