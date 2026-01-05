@@ -40,9 +40,11 @@ async def test_single_cycle_execution():
     start_task = asyncio.create_task(core.start())
     await asyncio.sleep(0.1)  # Let it initialize
     
-    # Wait for one cycle
+    # Wait for cycles to complete
     cycle_duration = 1.0 / config["cycle_rate_hz"]
-    await asyncio.sleep(cycle_duration * 2)  # Wait 2 cycles
+    # Wait 2 cycles to ensure at least one completes
+    CYCLE_COMPLETION_MULTIPLIER = 2.0
+    await asyncio.sleep(cycle_duration * CYCLE_COMPLETION_MULTIPLIER)
     
     # Query state
     snapshot = core.query_state()

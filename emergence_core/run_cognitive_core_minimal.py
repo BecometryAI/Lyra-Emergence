@@ -84,7 +84,9 @@ async def main():
     # Step 5: Run ONE cognitive cycle by waiting for cycle duration
     print("Step 5: Executing ONE cognitive cycle...")
     cycle_duration = 1.0 / config["cycle_rate_hz"]
-    await asyncio.sleep(cycle_duration * 1.5)  # Wait 1.5 cycles to ensure completion
+    # Wait 1.5 cycles to ensure at least one full cycle completes
+    CYCLE_COMPLETION_MULTIPLIER = 1.5
+    await asyncio.sleep(cycle_duration * CYCLE_COMPLETION_MULTIPLIER)
     print(f"✅ Cognitive cycle completed")
     print()
     
@@ -105,9 +107,10 @@ async def main():
     print()
     
     print(f"Active Percepts ({len(snapshot.percepts)}):")
-    for i, percept_id in enumerate(list(snapshot.percepts.keys())[:5], 1):  # Show first 5
-        percept = snapshot.percepts[percept_id]
-        print(f"  {i}. [{percept.modality}] {percept.id[:8]}...")
+    for i, (percept_id, percept_data) in enumerate(list(snapshot.percepts.items())[:5], 1):  # Show first 5
+        # percept_data is a dict from model_dump(), not a Percept object
+        modality = percept_data.get('modality', 'unknown')
+        print(f"  {i}. [{modality}] {percept_id[:8]}...")
     if len(snapshot.percepts) > 5:
         print(f"  ... and {len(snapshot.percepts) - 5} more")
     print()
