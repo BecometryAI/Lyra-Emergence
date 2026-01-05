@@ -294,10 +294,9 @@ class AttentionController:
                 
                 logger.debug(f"Selected percept: {percept.id} (score: {score:.3f}, complexity: {percept.complexity})")
             else:
-                # Budget exhausted - early termination
+                # Budget exhausted
                 rejected_budget.append((percept.id, score))
                 logger.debug(f"Budget exhausted: rejected {percept.id} (score: {score:.3f})")
-                # Continue to count all rejected for metrics, but could break early if metrics aren't needed
         
         # Log selection decision
         decision = {
@@ -444,7 +443,7 @@ class AttentionController:
             goal_norms = np.where(goal_norms == 0, 1, goal_norms)
             
             percept_embeddings_norm = percept_embeddings / percept_norms
-            goal_embeddings_norm = goal_embeddings / goal_norms.T
+            goal_embeddings_norm = goal_embeddings / goal_norms
             
             # Compute similarities
             similarities = percept_embeddings_norm @ goal_embeddings_norm.T

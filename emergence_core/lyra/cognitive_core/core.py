@@ -494,8 +494,12 @@ class CognitiveCore:
             ]
             
             if retrieve_goals:
-                # Retrieve memories and add as percepts
-                memory_percepts = await self.memory.retrieve_for_workspace(snapshot)
+                # Retrieve memories and add as percepts (fast_mode for performance)
+                memory_percepts = await self.memory.retrieve_for_workspace(
+                    snapshot, 
+                    fast_mode=True,
+                    timeout=0.05
+                )
                 new_percepts.extend(memory_percepts)
             subsystem_timings['memory_retrieval'] = (time.time() - step_start) * 1000
             
