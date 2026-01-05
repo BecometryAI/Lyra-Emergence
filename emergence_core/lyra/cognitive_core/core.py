@@ -477,12 +477,16 @@ class CognitiveCore:
         12. RATE LIMITING: Maintain ~10 Hz
         """
         cycle_start = time.time()
+        subsystem_timings = {}  # Track per-subsystem times
         
         try:
             # 1. PERCEPTION: Process queued inputs
+            step_start = time.time()
             new_percepts = await self._gather_percepts()
+            subsystem_timings['perception'] = (time.time() - step_start) * 1000  # ms
             
             # 2. MEMORY RETRIEVAL: Check for memory retrieval goals
+            step_start = time.time()
             snapshot = self.workspace.broadcast()
             retrieve_goals = [
                 g for g in snapshot.goals
@@ -493,16 +497,22 @@ class CognitiveCore:
                 # Retrieve memories and add as percepts
                 memory_percepts = await self.memory.retrieve_for_workspace(snapshot)
                 new_percepts.extend(memory_percepts)
+            subsystem_timings['memory_retrieval'] = (time.time() - step_start) * 1000
             
             # 3. ATTENTION: Select for conscious awareness
+            step_start = time.time()
             attended = self.attention.select_for_broadcast(new_percepts)
             self.metrics['attention_selections'] += len(attended)
             self.metrics['percepts_processed'] += len(new_percepts)
+            subsystem_timings['attention'] = (time.time() - step_start) * 1000
             
             # 4. AFFECT: Update emotional state
+            step_start = time.time()
             affect_update = self.affect.compute_update(self.workspace.broadcast())
+            subsystem_timings['affect'] = (time.time() - step_start) * 1000
             
             # 5. ACTION: Decide what to do
+            step_start = time.time()
             actions = self.action.decide(self.workspace.broadcast())
             
             # Get snapshot before executing actions
@@ -553,8 +563,10 @@ class CognitiveCore:
                     # Trigger self-model refinement if error detected
                     if validated and not validated.correct and validated.error_magnitude > self.meta_cognition.refinement_threshold:
                         self.meta_cognition.refine_self_model_from_errors([validated])
+            subsystem_timings['action'] = (time.time() - step_start) * 1000
             
             # 6. META-COGNITION: Introspect
+            step_start = time.time()
             meta_percepts = self.meta_cognition.observe(self.workspace.broadcast())
             
             # Phase 4.3: Auto-validate pending predictions
@@ -569,8 +581,10 @@ class CognitiveCore:
                     percept_type = percept.raw.get("type")
                     if percept_type in ["self_model_update", "behavioral_inconsistency", "existential_question"]:
                         self.introspective_journal.record_observation(percept.raw)
+            subsystem_timings['meta_cognition'] = (time.time() - step_start) * 1000
             
             # 7. AUTONOMOUS INITIATION: Check for autonomous speech triggers
+            step_start = time.time()
             snapshot = self.workspace.broadcast()
             autonomous_goal = self.autonomous.check_for_autonomous_triggers(snapshot)
             
@@ -578,8 +592,10 @@ class CognitiveCore:
                 # Add high-priority autonomous goal
                 self.workspace.add_goal(autonomous_goal)
                 logger.info(f"🗣️ Autonomous speech goal added: {autonomous_goal.description}")
+            subsystem_timings['autonomous_initiation'] = (time.time() - step_start) * 1000
             
             # 8. WORKSPACE UPDATE: Integrate everything
+            step_start = time.time()
             updates = []
             
             # Add attended percepts
@@ -594,12 +610,17 @@ class CognitiveCore:
                 updates.append({'type': 'percept', 'data': meta_percept})
             
             self.workspace.update(updates)
+            subsystem_timings['workspace_update'] = (time.time() - step_start) * 1000
             
             # 9. MEMORY CONSOLIDATION: Commit workspace to long-term memory (if appropriate)
+            step_start = time.time()
             await self.memory.consolidate(self.workspace.broadcast())
+            subsystem_timings['memory_consolidation'] = (time.time() - step_start) * 1000
             
             # 10. BROADCAST: Make state available
+            step_start = time.time()
             snapshot = self.workspace.broadcast()
+            subsystem_timings['broadcast'] = (time.time() - step_start) * 1000
             
             # 11. METRICS: Track performance
             cycle_time = time.time() - cycle_start
@@ -626,8 +647,8 @@ class CognitiveCore:
                 )
                 self.metrics['slow_cycles'] += 1
 
-            # Update metrics (includes slow cycle tracking)
-            self._update_metrics(cycle_time)
+            # Update metrics (includes slow cycle tracking and subsystem timings)
+            self._update_metrics(cycle_time, subsystem_timings)
             
             # Phase 4.3: Periodic accuracy snapshots (every 100 cycles)
             if self.meta_cognition and self.metrics['total_cycles'] % 100 == 0:
@@ -794,6 +815,39 @@ class CognitiveCore:
             'critical_cycle_percentage': critical_cycle_pct,
             'slowest_cycle_ms': self.metrics['slowest_cycle_ms'],
         }
+    
+    def get_performance_breakdown(self) -> Dict[str, Any]:
+        """
+        Get detailed performance breakdown by subsystem.
+        
+        Returns timing statistics for each subsystem including average, min, max,
+        and percentile values. Useful for identifying performance bottlenecks.
+        
+        Returns:
+            Dict mapping subsystem names to timing statistics (all values in ms)
+        """
+        if 'subsystem_timings' not in self.metrics:
+            return {}
+        
+        breakdown = {}
+        for subsystem, timings in self.metrics['subsystem_timings'].items():
+            if not timings:
+                continue
+            
+            timings_list = list(timings)
+            timings_sorted = sorted(timings_list)
+            n = len(timings_sorted)
+            
+            breakdown[subsystem] = {
+                'avg_ms': sum(timings_list) / n,
+                'min_ms': min(timings_list),
+                'max_ms': max(timings_list),
+                'p50_ms': timings_sorted[n // 2],
+                'p95_ms': timings_sorted[int(n * 0.95)] if n > 0 else 0,
+                'p99_ms': timings_sorted[int(n * 0.99)] if n > 0 else 0,
+            }
+        
+        return breakdown
     
     async def get_response(self, timeout: float = 5.0) -> Optional[Dict]:
         """
@@ -996,14 +1050,15 @@ class CognitiveCore:
         logger.info("💾 Auto-checkpoint disabled")
         return True
 
-    def _update_metrics(self, cycle_time: float) -> None:
+    def _update_metrics(self, cycle_time: float, subsystem_timings: Dict[str, float] = None) -> None:
         """
-        Track performance metrics.
+        Track performance metrics including per-subsystem timings.
         
         Updates internal metrics and logs periodic performance summaries.
         
         Args:
             cycle_time: Time taken for the current cycle (seconds)
+            subsystem_timings: Optional dict of subsystem name -> timing in ms
         """
         self.metrics['total_cycles'] += 1
         self.metrics['cycle_times'].append(cycle_time)
@@ -1013,14 +1068,48 @@ class CognitiveCore:
         if cycle_time_ms > self.metrics['slowest_cycle_ms']:
             self.metrics['slowest_cycle_ms'] = cycle_time_ms
         
+        # Track per-subsystem timings
+        if subsystem_timings:
+            if 'subsystem_timings' not in self.metrics:
+                self.metrics['subsystem_timings'] = {
+                    name: deque(maxlen=100) for name in subsystem_timings.keys()
+                }
+            
+            for subsystem, timing in subsystem_timings.items():
+                if subsystem not in self.metrics['subsystem_timings']:
+                    self.metrics['subsystem_timings'][subsystem] = deque(maxlen=100)
+                self.metrics['subsystem_timings'][subsystem].append(timing)
+        
         # Log every N cycles
         if self.metrics['total_cycles'] % self.config['log_interval_cycles'] == 0:
             avg_time = mean(self.metrics['cycle_times'])
-            logger.info(f"📊 Cycle {self.metrics['total_cycles']}: "
-                       f"avg_time={avg_time*1000:.1f}ms, "
-                       f"target={self.cycle_duration*1000:.0f}ms, "
-                       f"workspace_size={len(self.workspace.active_percepts)}, "
-                       f"goals={len(self.workspace.current_goals)}")
+            
+            # Calculate subsystem averages if available
+            if 'subsystem_timings' in self.metrics and subsystem_timings:
+                subsystem_avgs = {
+                    name: sum(timings) / len(timings) if timings else 0
+                    for name, timings in self.metrics['subsystem_timings'].items()
+                }
+                
+                # Sort by time descending to show bottlenecks first
+                sorted_subsystems = sorted(subsystem_avgs.items(), key=lambda x: -x[1])
+                subsystem_breakdown = "\n".join(
+                    f"    - {name}: {avg:.1f}ms" 
+                    for name, avg in sorted_subsystems
+                )
+                
+                logger.info(
+                    f"📊 Performance Summary (last {self.config['log_interval_cycles']} cycles):\n"
+                    f"  Total Cycles: {self.metrics['total_cycles']}\n"
+                    f"  Avg Cycle Time: {avg_time*1000:.1f}ms\n"
+                    f"  Subsystem Breakdown:\n{subsystem_breakdown}"
+                )
+            else:
+                logger.info(f"📊 Cycle {self.metrics['total_cycles']}: "
+                           f"avg_time={avg_time*1000:.1f}ms, "
+                           f"target={self.cycle_duration*1000:.0f}ms, "
+                           f"workspace_size={len(self.workspace.active_percepts)}, "
+                           f"goals={len(self.workspace.current_goals)}")
     
     async def _execute_action(self, action: Any) -> None:
         """
