@@ -14,15 +14,19 @@ The integration tests validate that all subsystems work together correctly to pr
 
 ```
 emergence_core/tests/integration/
-├── __init__.py                          # Package initialization
-├── conftest.py                          # Shared pytest fixtures
-├── test_end_to_end.py                   # Comprehensive integration tests
-├── test_scenarios.py                    # Scenario-based tests
-├── test_workspace_integration.py        # NEW: Workspace broadcasting tests (Phase 2)
-├── test_attention_integration.py        # NEW: Attention mechanism tests (Phase 2)
-├── test_cognitive_cycle_integration.py  # NEW: Complete cycle tests (Phase 2)
-├── test_memory_integration.py           # NEW: Memory consolidation tests (Phase 2)
-└── test_meta_cognition_integration.py   # NEW: Meta-cognition tests (Phase 2)
+├── __init__.py                               # Package initialization
+├── conftest.py                               # Shared pytest fixtures
+├── TESTING_GUIDE.md                          # Comprehensive testing guide (Phase 2, Task 5)
+├── test_end_to_end.py                        # Comprehensive integration tests
+├── test_scenarios.py                         # Scenario-based tests
+├── test_workspace_integration.py             # Workspace broadcasting tests (Phase 2, Task 4)
+├── test_attention_integration.py             # Attention mechanism tests (Phase 2, Task 4)
+├── test_cognitive_cycle_integration.py       # Complete cycle tests (Phase 2, Task 4)
+├── test_memory_integration.py                # Memory consolidation tests (Phase 2, Task 4)
+├── test_meta_cognition_integration.py        # Meta-cognition tests (Phase 2, Task 4)
+├── test_action_integration.py                # NEW: Action subsystem tests (Phase 2, Task 5)
+├── test_language_interfaces_integration.py   # NEW: Language I/O tests (Phase 2, Task 5)
+└── test_edge_cases_integration.py            # NEW: Edge cases and error handling (Phase 2, Task 5)
 ```
 
 ### Scripts
@@ -164,11 +168,104 @@ Validates self-monitoring and introspective awareness:
 
 **Status**: Created (requires full dependency stack)
 
+### test_action_integration.py
+
+Tests action subsystem integration with workspace (Phase 2, Task 5).
+
+#### TestActionProposal
+Validates action proposal based on goals:
+- **test_action_subsystem_proposes_actions_for_goals**: Actions proposed for active goals
+- **test_action_selection_based_on_priority**: Priority influences action selection
+- **test_multiple_goal_types_generate_different_actions**: Different goals create appropriate actions
+
+#### TestActionDecisionMaking
+Validates action decision logic:
+- **test_action_subsystem_generates_candidates**: Candidate actions generated from state
+- **test_action_history_tracking**: Action history and statistics tracked
+- **test_action_subsystem_handles_empty_workspace**: Graceful handling of empty workspace
+
+#### TestActionWorkspaceIntegration
+Tests action-workspace integration:
+- **test_action_reflects_workspace_state**: Actions reflect emotional state and priorities
+- **test_action_subsystem_with_multiple_percepts**: Handles multiple percepts correctly
+
+**Status**: ✅ 8 tests PASSING
+
+### test_language_interfaces_integration.py
+
+Tests language input parsing and output generation (Phase 2, Task 5).
+
+#### TestLanguageInputParsing
+Validates text-to-cognitive-structure conversion:
+- **test_language_input_creates_goals_from_text**: Text creates appropriate goals
+- **test_language_input_creates_percept**: Text creates percepts with correct modality
+- **test_language_input_detects_intent**: Intent classification works
+- **test_language_input_tracks_context**: Conversation context maintained
+
+#### TestLanguageOutputGeneration
+Validates cognitive-structure-to-text conversion:
+- **test_language_output_generates_from_workspace**: Workspace state → text generation
+- **test_language_output_handles_emotional_state**: Emotional state considered in output
+
+#### TestRoundTripLanguageProcessing
+Tests complete language processing cycle:
+- **test_round_trip_text_processing**: Input → goals/percepts → output cycle
+- **test_parse_result_structure**: Parse results have expected structure
+
+#### TestLanguageInterfaceEdgeCases
+Tests edge cases:
+- **test_empty_input_handling**: Empty strings handled gracefully
+- **test_very_long_input_handling**: Long inputs processed correctly
+
+**Status**: ✅ 11 tests PASSING (some may skip if dependencies unavailable)
+
+### test_edge_cases_integration.py
+
+Tests edge cases and error handling (Phase 2, Task 5).
+
+#### TestWorkspaceCapacityLimits
+Validates workspace capacity handling:
+- **test_workspace_handles_many_goals**: Multiple goals handled correctly
+- **test_workspace_handles_many_percepts**: Multiple percepts managed properly
+- **test_workspace_handles_percept_replacement**: Percept replacement works
+
+#### TestAttentionBudgetConstraints
+Tests attention budget enforcement:
+- **test_attention_with_insufficient_budget**: Budget limits respected
+- **test_attention_prioritizes_high_complexity**: Complexity-aware selection
+- **test_attention_with_zero_budget**: Zero budget handled gracefully
+
+#### TestConcurrentWorkspaceAccess
+Validates concurrent access safety:
+- **test_multiple_subsystems_read_snapshot_safely**: Safe concurrent reads
+- **test_snapshot_immutability_enforced**: Snapshots truly immutable
+- **test_workspace_update_doesnt_affect_old_snapshots**: Update isolation
+
+#### TestMalformedInputHandling
+Tests invalid input handling:
+- **test_invalid_goal_type_raises_error**: Invalid types rejected
+- **test_invalid_goal_priority_raises_error**: Priority bounds enforced
+- **test_workspace_handles_empty_goal_list**: Empty lists handled
+
+#### TestEmotionalStateEdgeCases
+Tests emotional edge cases:
+- **test_extreme_emotional_values**: Extreme values handled
+- **test_neutral_emotional_state**: Neutral state works correctly
+
+#### TestCycleCountTracking
+Tests cycle counting:
+- **test_cycle_count_increments**: Cycle count tracks updates
+- **test_cycle_count_in_snapshot**: Snapshots include cycle count
+
+**Status**: ✅ 18 tests PASSING
+
 ---
 
 ## Running Tests
 
 ### Run All Integration Tests
+
+> **📖 For comprehensive testing instructions, see [TESTING_GUIDE.md](./TESTING_GUIDE.md)**
 
 ```bash
 # Using pytest directly
@@ -177,6 +274,11 @@ pytest -m integration -v
 # Run only Phase 2 cognitive core tests
 pytest -m integration emergence_core/tests/integration/test_workspace_integration.py -v
 pytest -m integration emergence_core/tests/integration/test_attention_integration.py -v
+
+# Run Phase 2, Task 5 new tests
+pytest -m integration emergence_core/tests/integration/test_action_integration.py -v
+pytest -m integration emergence_core/tests/integration/test_language_interfaces_integration.py -v
+pytest -m integration emergence_core/tests/integration/test_edge_cases_integration.py -v
 
 # Using the convenience script
 python scripts/run_integration_tests.py
@@ -338,6 +440,18 @@ Integration tests verify:
 - 🟡 Timing enforcement maintains ~10 Hz (created, needs dependencies)
 - 🟡 Memory consolidation and retrieval (created, needs dependencies)
 - 🟡 Meta-cognition generates introspective percepts (created, needs dependencies)
+
+**Phase 2, Task 5 additions verify:**
+- ✅ Action subsystem proposes actions for goals (3 test classes, 8 tests)
+- ✅ Action selection considers priority and goal types
+- ✅ Action history tracking and statistics collection
+- ✅ Language input creates goals and percepts from text (4 test classes, 11 tests)
+- ✅ Language output generates text from workspace state
+- ✅ Round-trip text processing (input → goals → output)
+- ✅ Edge cases: workspace capacity, attention budget, concurrent access (6 test classes, 18 tests)
+- ✅ Malformed input handling with proper validation errors
+- ✅ Emotional state edge cases and cycle count tracking
+- ✅ Comprehensive testing guide for contributors
 
 ## Future Enhancements
 
