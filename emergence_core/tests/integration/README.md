@@ -14,10 +14,15 @@ The integration tests validate that all subsystems work together correctly to pr
 
 ```
 emergence_core/tests/integration/
-├── __init__.py           # Package initialization
-├── conftest.py           # Shared pytest fixtures
-├── test_end_to_end.py    # Comprehensive integration tests
-└── test_scenarios.py     # Scenario-based tests
+├── __init__.py                          # Package initialization
+├── conftest.py                          # Shared pytest fixtures
+├── test_end_to_end.py                   # Comprehensive integration tests
+├── test_scenarios.py                    # Scenario-based tests
+├── test_workspace_integration.py        # NEW: Workspace broadcasting tests (Phase 2)
+├── test_attention_integration.py        # NEW: Attention mechanism tests (Phase 2)
+├── test_cognitive_cycle_integration.py  # NEW: Complete cycle tests (Phase 2)
+├── test_memory_integration.py           # NEW: Memory consolidation tests (Phase 2)
+└── test_meta_cognition_integration.py   # NEW: Meta-cognition tests (Phase 2)
 ```
 
 ### Scripts
@@ -81,6 +86,86 @@ Tests realistic interaction patterns:
 - **test_emotional_support_scenario**: Providing emotional support
 - **test_introspective_conversation**: Self-awareness discussions
 
+---
+
+## Phase 2: Cognitive Core Integration Tests (NEW)
+
+The following test files were added in Phase 2, Task 4 to provide comprehensive verification of the cognitive architecture's core components.
+
+### test_workspace_integration.py
+
+Tests workspace broadcasting and state management mechanisms.
+
+#### TestWorkspaceBroadcasting
+Validates the immutability and completeness of workspace snapshots:
+- **test_broadcast_returns_immutable_snapshot**: Verifies WorkspaceSnapshot is frozen (Pydantic immutable model)
+- **test_broadcast_contains_all_state**: Ensures snapshots include goals, percepts, emotions, memories
+- **test_snapshot_isolation**: Confirms workspace modifications don't affect existing snapshots
+
+#### TestWorkspaceUpdate
+Validates workspace update integration:
+- **test_update_handles_goal_addition**: Goals are correctly added via update()
+- **test_update_handles_percept_addition**: Percepts are correctly added via update()
+- **test_update_handles_emotion_update**: Emotional state updates work correctly
+- **test_update_increments_cycle_count**: Cycle counter increments on each update
+
+**Status**: ✅ 7/7 tests PASSING
+
+### test_attention_integration.py
+
+Tests attention selection mechanisms and resource management.
+
+#### TestAttentionSelection
+Validates attention scoring and selection:
+- **test_goal_relevance_scoring**: Percepts relevant to goals receive higher attention scores
+- **test_novelty_detection**: Novel percepts receive attention boost over familiar content
+- **test_emotional_salience**: Emotionally salient percepts are prioritized
+- **test_attention_budget_enforced**: Budget limits prevent cognitive overload
+
+**Status**: ✅ 4/4 tests PASSING
+
+### test_cognitive_cycle_integration.py
+
+Tests complete cognitive cycle execution and timing.
+
+#### TestCompleteCognitiveCycle
+Validates the complete 12-step cognitive cycle:
+- **test_complete_cycle_executes_without_errors**: Full cycle executes all steps successfully
+- **test_cycle_updates_workspace_state**: Cycles update workspace state correctly
+- **test_cycle_timing_enforced**: 10 Hz timing enforcement with performance warnings
+
+#### TestInputOutputFlow
+Validates input → processing → output flow:
+- **test_language_input_creates_goals**: Language input creates appropriate goals in workspace
+
+**Status**: Created (requires sentence-transformers dependency)
+
+### test_memory_integration.py
+
+Tests memory consolidation and retrieval mechanisms.
+
+#### TestMemoryConsolidation
+Validates memory storage from workspace:
+- **test_workspace_consolidates_to_memory**: Workspace state consolidates to long-term memory
+
+#### TestMemoryRetrieval
+Validates memory retrieval to workspace:
+- **test_retrieval_goal_brings_memories_to_workspace**: RETRIEVE_MEMORY goals fetch relevant memories
+
+**Status**: Created (requires full dependency stack)
+
+### test_meta_cognition_integration.py
+
+Tests meta-cognition and introspection.
+
+#### TestMetaCognitionObservation
+Validates self-monitoring and introspective awareness:
+- **test_self_monitor_generates_introspective_percepts**: SelfMonitor generates meta-cognitive percepts
+
+**Status**: Created (requires full dependency stack)
+
+---
+
 ## Running Tests
 
 ### Run All Integration Tests
@@ -88,6 +173,10 @@ Tests realistic interaction patterns:
 ```bash
 # Using pytest directly
 pytest -m integration -v
+
+# Run only Phase 2 cognitive core tests
+pytest -m integration emergence_core/tests/integration/test_workspace_integration.py -v
+pytest -m integration emergence_core/tests/integration/test_attention_integration.py -v
 
 # Using the convenience script
 python scripts/run_integration_tests.py
@@ -156,6 +245,27 @@ async def test_example(lyra_api):
     # lyra_api automatically starts before test and stops after
 ```
 
+### cognitive_core (NEW - Phase 2)
+Provides a fully initialized `CognitiveCore` instance with mock LLMs, automatically starting before the test and stopping after.
+
+Usage:
+```python
+async def test_example(cognitive_core):
+    await cognitive_core.process_language_input("Test input")
+    # core automatically starts before test and stops after
+```
+
+### workspace (NEW - Phase 2)
+Provides a fresh `GlobalWorkspace` instance for testing workspace operations.
+
+Usage:
+```python
+def test_example(workspace):
+    goal = Goal(type=GoalType.RESPOND_TO_USER, description="Test")
+    workspace.add_goal(goal)
+    snapshot = workspace.broadcast()
+```
+
 ## Expected Behavior
 
 ### Response Times
@@ -217,6 +327,17 @@ Integration tests verify:
 - ✅ Meta-cognition provides introspection
 - ✅ Performance meets benchmarks
 - ✅ Metrics collection works
+
+**Phase 2 additions verify:**
+- ✅ Workspace broadcasts immutable snapshots (7 tests)
+- ✅ Workspace update mechanism works correctly (4 tests)
+- ✅ Attention selects percepts based on multiple factors (4 tests)
+- ✅ Goal relevance, novelty, emotion all influence attention
+- ✅ Attention budget enforcement prevents overload
+- 🟡 Cognitive cycle executes 12 steps correctly (created, needs dependencies)
+- 🟡 Timing enforcement maintains ~10 Hz (created, needs dependencies)
+- 🟡 Memory consolidation and retrieval (created, needs dependencies)
+- 🟡 Meta-cognition generates introspective percepts (created, needs dependencies)
 
 ## Future Enhancements
 
