@@ -12,6 +12,9 @@ from pathlib import Path
 from lyra.cognitive_core.core import CognitiveCore
 from lyra.cognitive_core.workspace import GlobalWorkspace, Goal, GoalType
 
+# Configuration constants  
+CYCLE_COMPLETION_MULTIPLIER = 1.5  # Wait 1.5 cycles to ensure at least one completes
+
 
 @pytest.mark.asyncio
 async def test_single_cycle_execution():
@@ -42,8 +45,7 @@ async def test_single_cycle_execution():
     
     # Wait for cycles to complete
     cycle_duration = 1.0 / config["cycle_rate_hz"]
-    # Wait 2 cycles to ensure at least one completes
-    CYCLE_COMPLETION_MULTIPLIER = 2.0
+    # Use same multiplier as main script for consistency
     await asyncio.sleep(cycle_duration * CYCLE_COMPLETION_MULTIPLIER)
     
     # Query state

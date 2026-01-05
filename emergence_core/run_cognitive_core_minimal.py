@@ -23,6 +23,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 from lyra.cognitive_core.core import CognitiveCore
 from lyra.cognitive_core.workspace import GlobalWorkspace, Goal, GoalType
 
+# Configuration constants
+CYCLE_COMPLETION_MULTIPLIER = 1.5  # Wait 1.5 cycles to ensure at least one completes
+
 
 async def main():
     """Run a single cognitive cycle and display results."""
@@ -84,8 +87,7 @@ async def main():
     # Step 5: Run ONE cognitive cycle by waiting for cycle duration
     print("Step 5: Executing ONE cognitive cycle...")
     cycle_duration = 1.0 / config["cycle_rate_hz"]
-    # Wait 1.5 cycles to ensure at least one full cycle completes
-    CYCLE_COMPLETION_MULTIPLIER = 1.5
+    # Wait for cycle completion using multiplier
     await asyncio.sleep(cycle_duration * CYCLE_COMPLETION_MULTIPLIER)
     print(f"✅ Cognitive cycle completed")
     print()
