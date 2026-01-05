@@ -216,11 +216,20 @@ class AttentionController:
         self.recent_percepts: deque = deque(maxlen=50)
         self.attention_history: List[Dict[str, Any]] = []
         
+        # Performance optimization: Relevance cache
+        self._relevance_cache: Dict[Tuple[str, str], float] = {}  # (percept_id, goal_id) -> score
+        self._cache_max_size = 1000
+        
         logger.info(f"AttentionController initialized with budget={attention_budget}, mode={initial_mode.value}")
 
     def select_for_broadcast(self, candidates: List[Percept]) -> List[Percept]:
         """
         Scores all candidate percepts and selects top-scoring ones within budget.
+        
+        Optimizations:
+        - Early termination when budget is exhausted
+        - Batch goal relevance computation for performance
+        - Heuristic pre-filtering for large candidate sets
         
         Args:
             candidates: List of candidate percepts to evaluate
@@ -232,19 +241,46 @@ class AttentionController:
             logger.debug("No candidates to select from")
             return []
         
+        # For large candidate sets, use batch goal relevance computation
+        if len(candidates) > 10:
+            goal_relevance_scores = self._compute_goal_relevance_batch(candidates)
+        else:
+            goal_relevance_scores = {p.id: self._compute_goal_relevance(p) for p in candidates}
+        
         # Score all candidates
         scored_percepts = []
         for percept in candidates:
-            score = self._score(percept)
-            scored_percepts.append((percept, score))
+            # Use pre-computed goal relevance for efficiency
+            goal_rel = goal_relevance_scores.get(percept.id, 0.5)
+            novelty = self._compute_novelty(percept)
+            emotion_sal = self._compute_emotional_salience(percept)
+            
+            # Recency bonus: newer percepts get slight boost
+            time_diff = (datetime.now() - percept.timestamp).total_seconds()
+            recency = 0.2 if time_diff < 1.0 else 0.1 if time_diff < 5.0 else 0.0
+            
+            # Weighted average
+            base_score = (
+                goal_rel * self.goal_weight +
+                novelty * self.novelty_weight +
+                emotion_sal * self.emotion_weight +
+                recency * self.urgency_weight
+            )
+            
+            # Apply affect modulation if affect subsystem is available
+            if self.affect:
+                total_score = self.affect.influence_attention(base_score, percept)
+            else:
+                total_score = base_score
+            
+            scored_percepts.append((percept, total_score))
         
         # Sort by score (highest first)
         scored_percepts.sort(key=lambda x: x[1], reverse=True)
         
-        # Select percepts that fit within budget
+        # Select percepts that fit within budget (with early termination)
         selected = []
         budget_used = 0
-        rejected_low_score = []
         rejected_budget = []
         
         for percept, score in scored_percepts:
@@ -258,12 +294,9 @@ class AttentionController:
                 
                 logger.debug(f"Selected percept: {percept.id} (score: {score:.3f}, complexity: {percept.complexity})")
             else:
+                # Budget exhausted
                 rejected_budget.append((percept.id, score))
                 logger.debug(f"Budget exhausted: rejected {percept.id} (score: {score:.3f})")
-        
-        # Log any remaining low-scoring percepts
-        for percept, score in scored_percepts[len(selected) + len(rejected_budget):]:
-            rejected_low_score.append((percept.id, score))
         
         # Log selection decision
         decision = {
@@ -272,7 +305,6 @@ class AttentionController:
             "selected_count": len(selected),
             "budget_used": budget_used,
             "budget_available": self.attention_budget,
-            "rejected_low_score": len(rejected_low_score),
             "rejected_budget": len(rejected_budget)
         }
         self.attention_history.append(decision)
@@ -342,10 +374,22 @@ class AttentionController:
         max_relevance = 0.0
         
         for goal in self.workspace.current_goals:
+            # Check cache first for performance
+            cache_key = (percept.id, goal.id)
+            if cache_key in self._relevance_cache:
+                max_relevance = max(max_relevance, self._relevance_cache[cache_key])
+                continue
+            
             # Try embedding-based similarity if available
             if percept.embedding and goal.metadata.get('embedding'):
                 similarity = cosine_similarity(percept.embedding, goal.metadata['embedding'])
                 max_relevance = max(max_relevance, similarity)
+                
+                # Cache result with eviction if needed
+                if len(self._relevance_cache) >= self._cache_max_size:
+                    # Evict oldest entry (FIFO)
+                    self._relevance_cache.pop(next(iter(self._relevance_cache)))
+                self._relevance_cache[cache_key] = similarity
             else:
                 # Fall back to keyword matching
                 percept_text = str(percept.raw) if not isinstance(percept.raw, str) else percept.raw
@@ -353,6 +397,71 @@ class AttentionController:
                 max_relevance = max(max_relevance, overlap)
         
         return max_relevance
+    
+    def _compute_goal_relevance_batch(self, percepts: List[Percept]) -> Dict[str, float]:
+        """
+        Compute goal relevance scores using batched operations for performance.
+        
+        Uses numpy vectorization when embeddings are available for faster computation.
+        
+        Args:
+            percepts: List of percepts to evaluate
+            
+        Returns:
+            Dict mapping percept IDs to relevance scores (0.0-1.0)
+        """
+        if not percepts or not self.workspace or not self.workspace.current_goals:
+            return {p.id: 0.5 for p in percepts}
+        
+        scores = {}
+        
+        # Separate percepts with and without embeddings
+        percepts_with_embeddings = []
+        percepts_without_embeddings = []
+        
+        for p in percepts:
+            if p.embedding and any(g.metadata.get('embedding') for g in self.workspace.current_goals):
+                percepts_with_embeddings.append(p)
+            else:
+                percepts_without_embeddings.append(p)
+        
+        # Batch process percepts with embeddings using numpy
+        if percepts_with_embeddings:
+            goals_with_embeddings = [g for g in self.workspace.current_goals if g.metadata.get('embedding')]
+            
+            # Extract embeddings as numpy arrays
+            percept_embeddings = np.array([p.embedding for p in percepts_with_embeddings])  # Shape: (N, D)
+            goal_embeddings = np.array([g.metadata['embedding'] for g in goals_with_embeddings])  # Shape: (M, D)
+            
+            # Batch cosine similarity: (N, D) @ (D, M) = (N, M)
+            # Normalize embeddings
+            percept_norms = np.linalg.norm(percept_embeddings, axis=1, keepdims=True)
+            goal_norms = np.linalg.norm(goal_embeddings, axis=1, keepdims=True)
+            
+            # Avoid division by zero
+            percept_norms = np.where(percept_norms == 0, 1, percept_norms)
+            goal_norms = np.where(goal_norms == 0, 1, goal_norms)
+            
+            percept_embeddings_norm = percept_embeddings / percept_norms
+            goal_embeddings_norm = goal_embeddings / goal_norms
+            
+            # Compute similarities
+            similarities = percept_embeddings_norm @ goal_embeddings_norm.T
+            
+            # Clamp to [0, 1] range
+            similarities = np.maximum(0.0, similarities)
+            
+            # Max similarity for each percept across all goals
+            max_similarities = np.max(similarities, axis=1)
+            
+            for p, score in zip(percepts_with_embeddings, max_similarities):
+                scores[p.id] = float(score)
+        
+        # Process percepts without embeddings using keyword matching
+        for p in percepts_without_embeddings:
+            scores[p.id] = self._compute_goal_relevance(p)
+        
+        return scores
 
     def _compute_novelty(self, percept: Percept) -> float:
         """

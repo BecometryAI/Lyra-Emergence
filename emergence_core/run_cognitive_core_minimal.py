@@ -146,6 +146,27 @@ async def main():
     print(f"  Slowest Cycle: {metrics['slowest_cycle_ms']:.2f} ms")
     print()
     
+    # Display performance breakdown
+    print("=" * 70)
+    print("PERFORMANCE BREAKDOWN")
+    print("=" * 70)
+    print()
+    
+    breakdown = core.get_performance_breakdown()
+    if breakdown:
+        print("Per-Subsystem Timing (averages over last cycles):")
+        print()
+        for subsystem, stats in sorted(breakdown.items(), key=lambda x: -x[1]['avg_ms']):
+            print(f"  {subsystem}:")
+            print(f"    Average: {stats['avg_ms']:.2f}ms")
+            print(f"    Min: {stats['min_ms']:.2f}ms")
+            print(f"    Max: {stats['max_ms']:.2f}ms")
+            print(f"    P95: {stats['p95_ms']:.2f}ms")
+            print()
+    else:
+        print("  No performance data available yet")
+    print()
+    
     # Step 9: Stop the cognitive core
     print("Step 9: Stopping CognitiveCore...")
     await core.stop()
