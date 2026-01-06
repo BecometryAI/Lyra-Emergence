@@ -112,7 +112,7 @@ class MindVectorDB:
             raise
 
     def index(self) -> None:
-        """(Re)Creates the vector index from the Mind file with blockchain verification."""
+        """(Re)Creates the vector index from the Mind file."""
         logger.info(f"(Re)Indexing '{self.mind_file}' to '{self.db_path}'...")
         chunks = self.load_and_chunk_mind()
         
