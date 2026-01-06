@@ -72,45 +72,71 @@ class ActionExecutor:
             logger.error(f"Error executing action {action.type}: {e}", exc_info=True)
     
     async def execute_speak(self, action) -> None:
-        """Execute SPEAK action."""
-        snapshot = self.state.workspace.broadcast()
-        context = {
-            "user_input": action.metadata.get("responding_to", "")
-        }
+        """
+        Execute SPEAK action with validation.
         
-        # Generate response using language output generator
-        response = await self.subsystems.language_output.generate(snapshot, context)
-        
-        # Queue response for external retrieval
-        await self.state.queue_output({
-            "type": "SPEAK",
-            "text": response,
-            "emotion": snapshot.emotions,
-            "timestamp": datetime.now()
-        })
-        logger.info(f"🗣️ Lyra: {response[:100]}...")
+        Args:
+            action: Action with metadata containing response context
+        """
+        try:
+            snapshot = self.state.workspace.broadcast()
+            context = {
+                "user_input": action.metadata.get("responding_to", "") if hasattr(action, 'metadata') else ""
+            }
+            
+            # Generate response using language output generator
+            response = await self.subsystems.language_output.generate(snapshot, context)
+            
+            # Validate response before queueing
+            if not response or not isinstance(response, str):
+                logger.warning(f"Invalid response generated: {type(response)}")
+                response = "..." # Fallback response
+            
+            # Queue response for external retrieval
+            await self.state.queue_output({
+                "type": "SPEAK",
+                "text": response,
+                "emotion": snapshot.emotions,
+                "timestamp": datetime.now()
+            })
+            logger.info(f"🗣️ Lyra: {response[:100]}...")
+        except Exception as e:
+            logger.error(f"Failed to execute SPEAK action: {e}", exc_info=True)
     
     async def execute_speak_autonomous(self, action) -> None:
-        """Execute SPEAK_AUTONOMOUS action."""
-        snapshot = self.state.workspace.broadcast()
-        context = {
-            "autonomous": True,
-            "trigger": action.metadata.get("trigger"),
-            "introspection_content": action.metadata.get("introspection_content")
-        }
+        """
+        Execute SPEAK_AUTONOMOUS action with validation.
         
-        # Generate response using language output generator
-        response = await self.subsystems.language_output.generate(snapshot, context)
-        
-        # Queue autonomous response for external retrieval
-        await self.state.queue_output({
-            "type": "SPEAK_AUTONOMOUS",
-            "text": response,
-            "trigger": action.metadata.get("trigger"),
-            "emotion": snapshot.emotions,
-            "timestamp": datetime.now()
-        })
-        logger.info(f"🗣️💭 Lyra (autonomous): {response[:100]}...")
+        Args:
+            action: Action with metadata containing trigger and content
+        """
+        try:
+            snapshot = self.state.workspace.broadcast()
+            context = {
+                "autonomous": True,
+                "trigger": action.metadata.get("trigger") if hasattr(action, 'metadata') else None,
+                "introspection_content": action.metadata.get("introspection_content") if hasattr(action, 'metadata') else None
+            }
+            
+            # Generate response using language output generator
+            response = await self.subsystems.language_output.generate(snapshot, context)
+            
+            # Validate response before queueing
+            if not response or not isinstance(response, str):
+                logger.warning(f"Invalid autonomous response generated: {type(response)}")
+                response = "..." # Fallback response
+            
+            # Queue autonomous response for external retrieval
+            await self.state.queue_output({
+                "type": "SPEAK_AUTONOMOUS",
+                "text": response,
+                "trigger": context.get("trigger"),
+                "emotion": snapshot.emotions,
+                "timestamp": datetime.now()
+            })
+            logger.info(f"🗣️💭 Lyra (autonomous): {response[:100]}...")
+        except Exception as e:
+            logger.error(f"Failed to execute SPEAK_AUTONOMOUS action: {e}", exc_info=True)
     
     async def execute_tool(self, action) -> Optional[Percept]:
         """

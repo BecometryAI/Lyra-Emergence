@@ -53,7 +53,10 @@ class CycleExecutor:
     
     async def execute_cycle(self) -> Dict[str, float]:
         """
-        Execute one complete cognitive cycle.
+        Execute one complete cognitive cycle with error handling.
+        
+        Each step is wrapped in error handling to prevent cascade failures.
+        If a step fails, it's logged but the cycle continues to maintain system stability.
         
         Returns:
             Dict of subsystem timings in milliseconds
@@ -61,49 +64,89 @@ class CycleExecutor:
         subsystem_timings = {}
         
         # 1. PERCEPTION: Process queued inputs
-        step_start = time.time()
-        new_percepts = await self.state.gather_percepts(self.subsystems.perception)
-        subsystem_timings['perception'] = (time.time() - step_start) * 1000
+        try:
+            step_start = time.time()
+            new_percepts = await self.state.gather_percepts(self.subsystems.perception)
+            subsystem_timings['perception'] = (time.time() - step_start) * 1000
+        except Exception as e:
+            logger.error(f"Perception step failed: {e}", exc_info=True)
+            new_percepts = []
+            subsystem_timings['perception'] = 0.0
         
         # 2. MEMORY RETRIEVAL: Check for memory retrieval goals
-        step_start = time.time()
-        new_percepts.extend(await self._retrieve_memories())
-        subsystem_timings['memory_retrieval'] = (time.time() - step_start) * 1000
+        try:
+            step_start = time.time()
+            new_percepts.extend(await self._retrieve_memories())
+            subsystem_timings['memory_retrieval'] = (time.time() - step_start) * 1000
+        except Exception as e:
+            logger.error(f"Memory retrieval step failed: {e}", exc_info=True)
+            subsystem_timings['memory_retrieval'] = 0.0
         
         # 3. ATTENTION: Select for conscious awareness
-        step_start = time.time()
-        attended = self.subsystems.attention.select_for_broadcast(new_percepts)
-        subsystem_timings['attention'] = (time.time() - step_start) * 1000
+        try:
+            step_start = time.time()
+            attended = self.subsystems.attention.select_for_broadcast(new_percepts)
+            subsystem_timings['attention'] = (time.time() - step_start) * 1000
+        except Exception as e:
+            logger.error(f"Attention step failed: {e}", exc_info=True)
+            attended = []
+            subsystem_timings['attention'] = 0.0
         
         # 4. AFFECT: Update emotional state
-        step_start = time.time()
-        affect_update = self.subsystems.affect.compute_update(self.state.workspace.broadcast())
-        subsystem_timings['affect'] = (time.time() - step_start) * 1000
+        try:
+            step_start = time.time()
+            affect_update = self.subsystems.affect.compute_update(self.state.workspace.broadcast())
+            subsystem_timings['affect'] = (time.time() - step_start) * 1000
+        except Exception as e:
+            logger.error(f"Affect step failed: {e}", exc_info=True)
+            affect_update = {}
+            subsystem_timings['affect'] = 0.0
         
         # 5. ACTION: Decide what to do and execute
-        step_start = time.time()
-        await self._execute_actions()
-        subsystem_timings['action'] = (time.time() - step_start) * 1000
+        try:
+            step_start = time.time()
+            await self._execute_actions()
+            subsystem_timings['action'] = (time.time() - step_start) * 1000
+        except Exception as e:
+            logger.error(f"Action step failed: {e}", exc_info=True)
+            subsystem_timings['action'] = 0.0
         
         # 6. META-COGNITION: Introspect
-        step_start = time.time()
-        meta_percepts = await self._run_meta_cognition()
-        subsystem_timings['meta_cognition'] = (time.time() - step_start) * 1000
+        try:
+            step_start = time.time()
+            meta_percepts = await self._run_meta_cognition()
+            subsystem_timings['meta_cognition'] = (time.time() - step_start) * 1000
+        except Exception as e:
+            logger.error(f"Meta-cognition step failed: {e}", exc_info=True)
+            meta_percepts = []
+            subsystem_timings['meta_cognition'] = 0.0
         
         # 7. AUTONOMOUS INITIATION: Check for autonomous speech triggers
-        step_start = time.time()
-        await self._check_autonomous_triggers()
-        subsystem_timings['autonomous_initiation'] = (time.time() - step_start) * 1000
+        try:
+            step_start = time.time()
+            await self._check_autonomous_triggers()
+            subsystem_timings['autonomous_initiation'] = (time.time() - step_start) * 1000
+        except Exception as e:
+            logger.error(f"Autonomous initiation step failed: {e}", exc_info=True)
+            subsystem_timings['autonomous_initiation'] = 0.0
         
         # 8. WORKSPACE UPDATE: Integrate everything
-        step_start = time.time()
-        self._update_workspace(attended, affect_update, meta_percepts)
-        subsystem_timings['workspace_update'] = (time.time() - step_start) * 1000
+        try:
+            step_start = time.time()
+            self._update_workspace(attended, affect_update, meta_percepts)
+            subsystem_timings['workspace_update'] = (time.time() - step_start) * 1000
+        except Exception as e:
+            logger.error(f"Workspace update step failed: {e}", exc_info=True)
+            subsystem_timings['workspace_update'] = 0.0
         
         # 9. MEMORY CONSOLIDATION: Commit workspace to long-term memory
-        step_start = time.time()
-        await self.subsystems.memory.consolidate(self.state.workspace.broadcast())
-        subsystem_timings['memory_consolidation'] = (time.time() - step_start) * 1000
+        try:
+            step_start = time.time()
+            await self.subsystems.memory.consolidate(self.state.workspace.broadcast())
+            subsystem_timings['memory_consolidation'] = (time.time() - step_start) * 1000
+        except Exception as e:
+            logger.error(f"Memory consolidation step failed: {e}", exc_info=True)
+            subsystem_timings['memory_consolidation'] = 0.0
         
         return subsystem_timings
     

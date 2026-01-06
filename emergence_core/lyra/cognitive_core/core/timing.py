@@ -28,7 +28,7 @@ class TimingManager:
     
     def __init__(self, config: Dict[str, Any]):
         """
-        Initialize timing manager.
+        Initialize timing manager with validated configuration.
         
         Args:
             config: Configuration dict with:
@@ -36,9 +36,17 @@ class TimingManager:
                 - timing.warn_threshold_ms: Warn if cycle exceeds this
                 - timing.critical_threshold_ms: Critical warning threshold
                 - log_interval_cycles: How often to log metrics
+                
+        Raises:
+            ValueError: If configuration values are invalid
         """
         self.config = config
-        self.cycle_duration = 1.0 / config.get("cycle_rate_hz", 10)
+        
+        # Validate and set cycle rate
+        cycle_rate_hz = config.get("cycle_rate_hz", 10)
+        if cycle_rate_hz <= 0:
+            raise ValueError(f"cycle_rate_hz must be positive, got {cycle_rate_hz}")
+        self.cycle_duration = 1.0 / cycle_rate_hz
         
         # Performance metrics
         self.metrics: Dict[str, Any] = {
@@ -51,11 +59,23 @@ class TimingManager:
             'slowest_cycle_ms': 0.0,
         }
         
-        # Timing configuration
+        # Validate and set timing thresholds
         timing_config = config.get("timing", {})
         self.warn_threshold_ms = timing_config.get("warn_threshold_ms", 100)
         self.critical_threshold_ms = timing_config.get("critical_threshold_ms", 200)
+        
+        if self.warn_threshold_ms <= 0:
+            raise ValueError(f"warn_threshold_ms must be positive, got {self.warn_threshold_ms}")
+        if self.critical_threshold_ms <= self.warn_threshold_ms:
+            raise ValueError(
+                f"critical_threshold_ms ({self.critical_threshold_ms}) must be greater than "
+                f"warn_threshold_ms ({self.warn_threshold_ms})"
+            )
+        
+        # Validate and set log interval
         self.log_interval = config.get("log_interval_cycles", 100)
+        if self.log_interval <= 0:
+            raise ValueError(f"log_interval_cycles must be positive, got {self.log_interval}")
     
     def check_cycle_timing(self, cycle_time: float, cycle_number: int) -> None:
         """

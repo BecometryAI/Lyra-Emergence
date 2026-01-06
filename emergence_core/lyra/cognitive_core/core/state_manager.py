@@ -29,14 +29,22 @@ class StateManager:
     
     def __init__(self, workspace: Optional[GlobalWorkspace], config: Dict[str, Any]):
         """
-        Initialize state manager.
+        Initialize state manager with validated configuration.
         
         Args:
             workspace: GlobalWorkspace instance or None to create new
-            config: Configuration dict
+            config: Configuration dict with max_queue_size parameter
+            
+        Raises:
+            ValueError: If configuration values are invalid
         """
         self.config = config
         self.workspace = workspace if workspace is not None else GlobalWorkspace()
+        
+        # Validate queue size
+        max_queue_size = config.get("max_queue_size", 100)
+        if max_queue_size <= 0:
+            raise ValueError(f"max_queue_size must be positive, got {max_queue_size}")
         
         # Control flags
         self.running = False
