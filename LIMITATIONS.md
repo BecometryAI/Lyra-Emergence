@@ -453,25 +453,7 @@ if emotion.arousal > ANXIETY_THRESHOLD:
 - Be explicit about what code actually does
 - Reserve anthropomorphic language for user-facing descriptions
 
-### 4.3 Blockchain/Wallet Components
-
-**Problem:** Repository includes blockchain and LMT (Lyra Memory Token) wallet files:
-- `emergence_core/lyra/blockchain.py`
-- `data/wallet/lmt_wallet.json`
-- `emergence_core/lyra/config/blockchain_config.json`
-
-**Why This Is Confusing:**
-- Not clearly connected to cognitive architecture
-- Adds complexity without obvious benefit to research goals
-- Might be prototype for resource management?
-- Purpose and integration unclear
-
-**Needed:**
-- Documentation explaining purpose and relationship to cognitive architecture
-- If vestigial, consider removing or moving to separate branch
-- If active, clarify how it serves consciousness research goals
-
-### 4.4 Testing Coverage
+### 4.3 Testing Coverage
 
 **Current State:**
 - Consciousness tests exist but measure language generation, not function
@@ -584,7 +566,6 @@ Users and contributors deserve to know:
 - Update README to align with this honest assessment
 - Add architectural decision records (ADRs)
 - Document experiments and their results
-- Clarify blockchain/wallet purpose or remove
 
 **Research:**
 - Pre-register specific consciousness hypotheses
