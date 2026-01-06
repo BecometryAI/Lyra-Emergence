@@ -336,8 +336,12 @@ class SelfMonitor:
         """
         Get detailed accuracy metrics.
         
-        This is a simplified version. Full implementation would need
-        _empty_accuracy_metrics and _calculate_temporal_trends helpers.
+        NOTE: This is a simplified implementation. Full accuracy metrics with
+        temporal trends and detailed calibration analysis are available through
+        the individual component methods (confidence_estimator, metrics_reporter).
+        
+        TODO: Consider implementing _calculate_temporal_trends if detailed
+        temporal analysis is needed at the facade level.
         """
         records = list(self.confidence_estimator.prediction_records.values())
         if time_window:

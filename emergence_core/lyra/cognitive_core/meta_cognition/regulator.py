@@ -8,7 +8,7 @@ prediction errors and observed outcomes.
 from __future__ import annotations
 
 import logging
-from typing import Dict, Any, List
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 from ._shared import PredictionRecord
