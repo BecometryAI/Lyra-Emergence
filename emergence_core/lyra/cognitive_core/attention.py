@@ -436,6 +436,20 @@ class AttentionController:
     for the limited-capacity GlobalWorkspace. It evaluates incoming information
     from multiple sources (percepts, memories, emotions, internal states) and
     assigns attention scores based on multiple factors.
+    
+    **Competitive Dynamics (New):**
+    The controller now supports genuine competitive attention dynamics based on
+    Global Workspace Theory. When enabled with `use_competition=True`, percepts
+    actively compete for workspace access through lateral inhibition, ignition
+    thresholds, and coalition formation. This is fundamentally different from
+    simple top-N selection.
+    
+    **Backward Compatibility:**
+    By default, `use_competition=False` to maintain backward compatibility with
+    existing code. To adopt the new GWT-compliant competitive dynamics, explicitly
+    set `use_competition=True` when initializing the controller. Future versions
+    may change the default to True once the system is thoroughly validated in
+    production.
 
     Key Responsibilities:
     - Evaluate attention worthiness of candidate information
@@ -457,6 +471,7 @@ class AttentionController:
     3. Emotional Salience: Amplifies attention for emotionally significant content
     4. Habituation: Reduces attention to repeated, non-threatening stimuli
     5. Resource Management: Prevents overload by limiting concurrent attention targets
+    6. Competitive Dynamics (Optional): Lateral inhibition and coalition formation
 
     The controller uses a weighted scoring system that can be dynamically adjusted
     based on current context, emotional state, and cognitive load. Different attention
@@ -468,6 +483,8 @@ class AttentionController:
         novelty_weight: Weight for novelty in scoring (0.0-1.0)
         emotion_weight: Weight for emotional salience in scoring (0.0-1.0)
         urgency_weight: Weight for urgency in scoring (0.0-1.0)
+        use_competition: Whether to use competitive dynamics (default: False)
+        competitive_attention: CompetitiveAttention instance if enabled
     """
 
     def __init__(

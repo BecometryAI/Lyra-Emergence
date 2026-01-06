@@ -5,6 +5,7 @@ Tests the core algorithms without dependency on the full package.
 """
 
 import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity as sklearn_cosine
 from typing import List, Dict, Any
 from dataclasses import dataclass, field
 
@@ -16,7 +17,6 @@ def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
         return 0.0
     v1 = np.array(vec1).reshape(1, -1)
     v2 = np.array(vec2).reshape(1, -1)
-    from sklearn.metrics.pairwise import cosine_similarity as sklearn_cosine
     similarity = sklearn_cosine(v1, v2)[0][0]
     return max(0.0, float(similarity))
 
