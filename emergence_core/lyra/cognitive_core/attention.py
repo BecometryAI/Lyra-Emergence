@@ -480,7 +480,7 @@ class AttentionController:
         novelty_weight: float = 0.3,
         emotion_weight: float = 0.2,
         urgency_weight: float = 0.1,
-        use_competition: bool = True,
+        use_competition: bool = False,
         inhibition_strength: float = 0.3,
         ignition_threshold: float = 0.5,
         competition_iterations: int = 10,
@@ -498,13 +498,17 @@ class AttentionController:
             novelty_weight: Importance of novelty in attention (0.0-1.0)
             emotion_weight: Importance of emotional salience in attention (0.0-1.0)
             urgency_weight: Importance of urgency in attention (0.0-1.0)
-            use_competition: Enable competitive attention dynamics (default: True)
+            use_competition: Enable competitive attention dynamics (default: False for backward compatibility)
             inhibition_strength: Strength of lateral inhibition in competition (0.0-1.0)
             ignition_threshold: Activation threshold for workspace entry (0.0-1.0)
             competition_iterations: Number of competition iterations to run
             coalition_boost: Boost factor for coalition members (0.0-1.0)
 
         Note: Weights should sum to approximately 1.0 for balanced scoring.
+        
+        To enable genuine competitive attention dynamics based on Global Workspace Theory,
+        set use_competition=True. This implements lateral inhibition, ignition thresholds,
+        and coalition formation instead of simple top-N selection.
         """
         self.attention_budget = attention_budget
         self.initial_budget = attention_budget
