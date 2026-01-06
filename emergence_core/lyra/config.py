@@ -47,13 +47,32 @@ class SystemConfig:
         # Determine project root for resolving relative paths
         if project_root is None:
             # Get the directory containing the config file
-            config_dir = Path(config_path).parent
-            # If config is in a 'config' subdirectory, the parent is the project root
-            if config_dir.name == 'config':
-                project_root = config_dir.parent
-            else:
-                # Otherwise, assume config_dir itself is the project root
-                project_root = config_dir
+            config_path_obj = Path(config_path).resolve()
+            current = config_path_obj.parent
+            
+            # Search upward for project root markers
+            project_markers = ['pyproject.toml', 'setup.py', '.git', 'uv.lock']
+            max_levels = 5  # Limit upward search to prevent going too far
+            
+            for _ in range(max_levels):
+                # Check if any project marker exists in current directory
+                if any((current / marker).exists() for marker in project_markers):
+                    project_root = current
+                    break
+                
+                # Move up one level
+                parent = current.parent
+                if parent == current:  # Reached filesystem root
+                    break
+                current = parent
+            
+            # If no project root found, fall back to config directory's parent
+            if project_root is None:
+                config_dir = config_path_obj.parent
+                if config_dir.name == 'config':
+                    project_root = config_dir.parent
+                else:
+                    project_root = config_dir
         
         def resolve_path(env_var: str, config_key: str) -> Path:
             """Resolve a path from environment variable or config file."""
