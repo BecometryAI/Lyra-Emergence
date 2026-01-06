@@ -46,11 +46,14 @@ class SystemConfig:
         
         # Determine project root for resolving relative paths
         if project_root is None:
-            # Use the directory containing the config file as reference
-            project_root = Path(config_path).parent.parent
-            # If config is in a nested 'config' dir, go up one more level
-            if project_root.name == 'config':
-                project_root = project_root.parent
+            # Get the directory containing the config file
+            config_dir = Path(config_path).parent
+            # If config is in a 'config' subdirectory, the parent is the project root
+            if config_dir.name == 'config':
+                project_root = config_dir.parent
+            else:
+                # Otherwise, assume config_dir itself is the project root
+                project_root = config_dir
         
         def resolve_path(env_var: str, config_key: str) -> Path:
             """Resolve a path from environment variable or config file."""
