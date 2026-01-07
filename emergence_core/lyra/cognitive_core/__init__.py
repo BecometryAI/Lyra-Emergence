@@ -12,7 +12,7 @@ cognitive substrate.
 
 from __future__ import annotations
 
-from .core import CognitiveCore
+from .core import CognitiveCore  # Now imported from core/ module
 from .workspace import (
     GlobalWorkspace,
     Goal,
@@ -27,10 +27,13 @@ from .perception import PerceptionSubsystem
 from .action import ActionSubsystem, Action, ActionType
 from .affect import AffectSubsystem
 from .meta_cognition import SelfMonitor, IntrospectiveJournal
+from .incremental_journal import IncrementalJournalWriter
 from .memory_integration import MemoryIntegration
 from .language_input import LanguageInputParser, IntentType, Intent, ParseResult
 from .language_output import LanguageOutputGenerator
 from .llm_client import LLMClient, GemmaClient, LlamaClient, MockLLMClient, LLMError
+from .checkpoint import CheckpointManager, CheckpointInfo
+from .memory_gc import MemoryGarbageCollector, CollectionStats, MemoryHealthReport
 from .structured_formats import (
     LLMInputParseRequest,
     LLMInputParseResponse,
@@ -83,6 +86,7 @@ __all__ = [
     "AffectSubsystem",
     "SelfMonitor",
     "IntrospectiveJournal",
+    "IncrementalJournalWriter",
     "MemoryIntegration",
     "LanguageInputParser",
     "IntentType",
@@ -94,6 +98,11 @@ __all__ = [
     "LlamaClient",
     "MockLLMClient",
     "LLMError",
+    "CheckpointManager",
+    "CheckpointInfo",
+    "MemoryGarbageCollector",
+    "CollectionStats",
+    "MemoryHealthReport",
     "LLMInputParseRequest",
     "LLMInputParseResponse",
     "OutputGenerationRequest",

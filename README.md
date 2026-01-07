@@ -298,6 +298,7 @@ All models are **pre-trained and ready to use** - no fine-tuning or training nec
   - Self​Monitor for introspection
   - IntrospectiveLoop implementation
   - Consciousness testing framework
+  - **Incremental journal saving** - Real-time persistence prevents data loss
 
 - ✅ **Phase 5.1: Pure GWT Architecture** (This Release)
   - Removed legacy "Cognitive Committee" specialist architecture
@@ -566,11 +567,13 @@ Models will be automatically downloaded from Hugging Face on first use. Ensure y
 
 ### Running the System
 
-**Option 1: Run Cognitive Core (New Architecture)**
+**Starting the Cognitive Core**
+
+The cognitive core is the main entry point for the pure GWT architecture:
+
 ```bash
-# Start the cognitive core with continuous recurrent loop
-# Note: Requires Phase 2+ completion. Check Project Status section for current phase.
-uv run python -m emergence_core.lyra.cognitive_core.core
+# Run the cognitive core with continuous recurrent loop
+python emergence_core/run_cognitive_core.py
 
 # The cognitive core will:
 # - Initialize GlobalWorkspace and all subsystems
@@ -586,12 +589,41 @@ The autonomous cognitive loop runs automatically when the cognitive core initial
 - **Goal-directed behavior**: Internal motivations drive actions
 - **Emotional dynamics**: Affect influences all processing
 - **Meta-cognition**: Self-monitoring provides introspection
+- **Introspective Journal**: Real-time persistence of self-observations
+
+#### Incremental Journal Saving
+
+The introspective journal now uses **incremental saving** to prevent data loss:
+- Entries written immediately to disk (no batching)
+- JSONL format (one JSON object per line) for crash recovery
+- Automatic journal rotation when files exceed size limit
+- Compression of archived journals to save space
+- Recovery tools for validation and repair
+
+**Journal Files:**
+```
+data/introspection/journal_YYYY-MM-DD_HH-MM-SS.jsonl       # Active journal
+data/introspection/journal_YYYY-MM-DD_HH-MM-SS.jsonl.gz    # Archived (compressed)
+```
+
+**Recovery Tool:**
+```bash
+# Validate journal integrity
+python scripts/recover_journal.py validate data/introspection/journal_2026-01-03.jsonl
+
+# Extract entries by type
+python scripts/recover_journal.py extract --type realization --days 7
+
+# Merge multiple journals
+python scripts/recover_journal.py merge --output merged.jsonl
+
+# Repair corrupted journal
+python scripts/recover_journal.py repair corrupted.jsonl --output repaired.jsonl
+```
 
 **Discord Integration:**
-```bash
-# Ensure DISCORD_TOKEN is set in .env
-uv run run_discord_bot.py
-```
+
+The Discord bot integration is planned for future development using the new cognitive core architecture.
 
 ### Troubleshooting
 
@@ -649,9 +681,28 @@ uv run pytest emergence_core/tests/test_interfaces.py
 
 ## Running the System
 
-### Starting the Cognitive Core
+### Quick Start: Minimal Single-Cycle Test
 
-The cognitive core is the main entry point for the pure GWT architecture:
+To verify the cognitive core is functional, run the minimal CLI:
+
+```bash
+# Run a single cognitive cycle and exit
+python emergence_core/run_cognitive_core_minimal.py
+```
+
+**Expected output:**
+- Initialization of all subsystems
+- Execution of one cognitive cycle
+- Display of workspace state (goals, percepts, emotions)
+- Performance metrics (cycle time, Hz, attention selections)
+- Verification checks (✅ pass or ❌ fail)
+- Exit code 0 if successful
+
+**Purpose:** This script proves the cognitive architecture runs without errors and provides a baseline for development.
+
+### Starting the Cognitive Core (Continuous Mode)
+
+For continuous operation, use the existing entry point:
 
 ```bash
 # Run the cognitive core
@@ -692,16 +743,215 @@ pytest emergence_core/tests/test_language_input.py
 
 # Run consciousness tests
 pytest emergence_core/tests/test_consciousness_tests.py
+
+# Run checkpoint tests
+pytest emergence_core/tests/test_checkpoint.py
 ```
 
-### Notes on Deprecated Files
+### Workspace State Checkpointing
 
-Some files from the old "Cognitive Committee" architecture remain in the repository but are marked as DEPRECATED:
-- `emergence_core/run.py` - Old API server
-- `emergence_core/run_lyra_bot.py` - Old Discord bot
-- `emergence_core/lyra/api.py` - Old REST API
+Lyra-Emergence includes comprehensive workspace state checkpointing for session continuity and recovery:
 
-These files will be updated or removed in future releases. Use `run_cognitive_core.py` for the current pure GWT architecture.
+#### Features
+
+- **Manual Checkpoints**: Save workspace state at critical points
+- **Automatic Periodic Checkpoints**: Background auto-save at configurable intervals
+- **Session Recovery**: Restore from checkpoint after crashes or interruptions
+- **Experimentation Support**: Save before risky changes, restore if needed
+- **Checkpoint Management**: List, load, and delete checkpoints
+- **Compression**: gzip compression for efficient storage
+- **Atomic Writes**: Prevents corruption during save operations
+- **Checkpoint Rotation**: Automatic cleanup to prevent unbounded disk usage
+
+#### Configuration
+
+Configure checkpointing in your CognitiveCore config:
+
+```python
+config = {
+    "checkpointing": {
+        "enabled": True,
+        "auto_save": True,
+        "auto_save_interval": 300.0,  # 5 minutes
+        "checkpoint_dir": "data/checkpoints/",
+        "max_checkpoints": 20,
+        "compression": True,
+        "checkpoint_on_shutdown": True,
+    }
+}
+
+core = CognitiveCore(config=config)
+```
+
+#### CLI Commands
+
+When using the Lyra CLI (`python -m lyra.cli`), checkpointing commands are available:
+
+```bash
+# Save current state with optional label
+save [label]
+
+# List all available checkpoints
+checkpoints
+
+# Load a specific checkpoint by ID
+load <checkpoint_id>
+
+# Restore from most recent checkpoint
+restore latest
+
+# Show all commands
+help
+```
+
+#### Programmatic Usage
+
+```python
+from emergence_core.lyra.cognitive_core import CognitiveCore
+
+# Create cognitive core with checkpointing
+core = CognitiveCore(config={"checkpointing": {"enabled": True}})
+
+# Manual save with label
+checkpoint_path = core.save_state(label="Before experiment")
+
+# Restore from checkpoint (when not running)
+success = core.restore_state(checkpoint_path)
+
+# Enable auto-checkpointing (when running)
+await core.start()
+core.enable_auto_checkpoint(interval=300.0)  # Every 5 minutes
+
+# Disable auto-checkpointing
+core.disable_auto_checkpoint()
+
+# Start with automatic restore from latest checkpoint
+await core.start(restore_latest=True)
+```
+
+#### Demo Script
+
+Run the checkpoint demo to see all features in action:
+
+```bash
+# Full demo (requires running cognitive loop)
+python scripts/demo_checkpointing.py
+
+# Simplified demo (no cognitive loop dependencies)
+python scripts/demo_checkpointing_simple.py
+```
+
+#### Checkpoint File Format
+
+Checkpoints are stored as JSON (optionally gzip-compressed):
+
+```json
+{
+    "version": "1.0",
+    "timestamp": "2026-01-02T12:34:56Z",
+    "checkpoint_id": "uuid-string",
+    "workspace_state": {
+        "goals": [...],
+        "percepts": {...},
+        "emotions": {...},
+        "memories": [...],
+        "cycle_count": 12345
+    },
+    "metadata": {
+        "user_label": "Before important conversation",
+        "auto_save": false,
+        "shutdown": false
+    }
+}
+```
+
+### Memory Garbage Collection
+
+Lyra includes an automatic memory garbage collection (GC) system to prevent unbounded memory growth while preserving important memories.
+
+#### Features
+
+- **Significance-Based Removal**: Removes memories below configurable significance threshold
+- **Age-Based Decay**: Applies time decay to significance scores
+- **Capacity-Based Pruning**: Enforces maximum memory capacity limits
+- **Protected Memories**: Never removes memories tagged as "important" or "pinned"
+- **Recent Memory Protection**: Protects memories < 24 hours old
+- **Automatic Scheduling**: Runs periodically in background
+- **Dry-Run Mode**: Preview what would be removed without executing
+
+#### Configuration
+
+Add to your cognitive core configuration:
+
+```python
+"memory_gc": {
+    "enabled": True,
+    "collection_interval": 3600.0,  # 1 hour
+    "significance_threshold": 0.1,
+    "decay_rate_per_day": 0.01,
+    "max_memory_capacity": 10000,
+    "preserve_tags": ["important", "pinned", "charter_related"],
+    "recent_memory_protection_hours": 24,
+    "max_removal_per_run": 100
+}
+```
+
+#### CLI Commands
+
+```bash
+# View memory health statistics
+memory stats
+
+# Run garbage collection manually
+memory gc
+
+# Run with custom threshold
+memory gc --threshold 0.2
+
+# Preview what would be removed (dry-run)
+memory gc --dry-run
+
+# Enable/disable automatic GC
+memory autogc on
+memory autogc off
+```
+
+#### Programmatic Usage
+
+```python
+from lyra.memory_manager import MemoryManager
+
+manager = MemoryManager(
+    base_dir=Path("./data/memories"),
+    chroma_dir=Path("./data/chroma"),
+    gc_config={"significance_threshold": 0.15}
+)
+
+# Enable automatic GC
+manager.enable_auto_gc(interval=3600.0)
+
+# Run manual GC
+stats = await manager.run_gc(threshold=0.2)
+print(f"Removed {stats.memories_removed} memories")
+
+# Get memory health
+health = await manager.get_memory_health()
+if health.needs_collection:
+    print("Collection recommended!")
+
+# Disable automatic GC
+manager.disable_auto_gc()
+```
+
+#### Demo Script
+
+See the memory GC in action:
+
+```bash
+python scripts/demo_memory_gc.py
+```
+
+For complete documentation, see [docs/MEMORY_GC_GUIDE.md](docs/MEMORY_GC_GUIDE.md).
 
 ### Contributing to the Cognitive Architecture
 

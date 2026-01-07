@@ -16,6 +16,7 @@ Author: Lyra Emergence Team
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Dict, List, Optional
 from datetime import datetime
@@ -83,7 +84,8 @@ class MemoryIntegration:
             base_dir=base_dir,
             chroma_dir=chroma_dir,
             blockchain_enabled=memory_config.get("blockchain_enabled", False),
-            blockchain_config=memory_config.get("blockchain_config", {})
+            blockchain_config=memory_config.get("blockchain_config", {}),
+            gc_config=memory_config.get("gc_config", {})
         )
         
         # Consolidation parameters
@@ -94,7 +96,12 @@ class MemoryIntegration:
         
         logger.info("✅ MemoryIntegration initialized")
     
-    async def retrieve_for_workspace(self, snapshot: WorkspaceSnapshot) -> List[Percept]:
+    async def retrieve_for_workspace(
+        self, 
+        snapshot: WorkspaceSnapshot,
+        fast_mode: bool = True,
+        timeout: float = 0.05
+    ) -> List[Percept]:
         """
         Retrieve relevant memories and convert to percepts.
         
@@ -103,8 +110,14 @@ class MemoryIntegration:
         and converts retrieved memories into percepts that can compete for
         attention in the next cognitive cycle.
         
+        Optimizations:
+        - fast_mode: Retrieve fewer results (3 vs 5) for speed
+        - timeout: Abort retrieval if it takes too long
+        
         Args:
             snapshot: Current workspace state snapshot
+            fast_mode: If True, retrieve fewer results for speed (default: True)
+            timeout: Maximum time to wait for retrieval in seconds (default: 0.05)
             
         Returns:
             List of memory-percepts ready for attention processing
@@ -116,12 +129,22 @@ class MemoryIntegration:
             logger.debug("No query could be built from workspace state")
             return []
         
-        # Search memory system using recall
+        # Adjust k based on fast_mode for performance
+        k = min(self.retrieval_top_k, 3) if fast_mode else self.retrieval_top_k
+        
+        # Search memory system using recall with timeout
         try:
-            memories = await self.memory_manager.recall(
-                query=query,
-                n_results=self.retrieval_top_k
+            # Run memory retrieval with timeout to prevent blocking
+            memories = await asyncio.wait_for(
+                self.memory_manager.recall(
+                    query=query,
+                    n_results=k
+                ),
+                timeout=timeout
             )
+        except asyncio.TimeoutError:
+            logger.warning(f"Memory retrieval timed out after {timeout}s, returning empty")
+            return []
         except Exception as e:
             logger.error(f"Memory retrieval failed: {e}", exc_info=True)
             return []
@@ -132,7 +155,7 @@ class MemoryIntegration:
             for memory in memories
         ]
         
-        logger.info(f"💾 Retrieved {len(memory_percepts)} memory-percepts")
+        logger.info(f"💾 Retrieved {len(memory_percepts)} memory-percepts (fast_mode={fast_mode})")
         return memory_percepts
     
     async def consolidate(self, snapshot: WorkspaceSnapshot) -> None:
