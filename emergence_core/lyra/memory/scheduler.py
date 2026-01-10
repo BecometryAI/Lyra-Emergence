@@ -14,6 +14,11 @@ from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
+# Consolidation budget thresholds
+MINIMAL_CONSOLIDATION_THRESHOLD = 0.2  # Budget below this triggers minimal consolidation
+STANDARD_CONSOLIDATION_THRESHOLD = 0.5  # Budget below this triggers standard consolidation
+# Budget >= 0.5 triggers full consolidation
+
 
 @dataclass
 class ConsolidationMetrics:
@@ -179,14 +184,14 @@ class ConsolidationScheduler:
         emotional = 0
         
         try:
-            if budget < 0.2:
+            if budget < MINIMAL_CONSOLIDATION_THRESHOLD:
                 # Minimal consolidation - just strengthen frequently retrieved
                 logger.debug("Running minimal consolidation")
                 strengthened = await asyncio.to_thread(
                     self.engine.strengthen_retrieved_memories
                 )
                 
-            elif budget < 0.5:
+            elif budget < STANDARD_CONSOLIDATION_THRESHOLD:
                 # Standard consolidation - strengthen and decay
                 logger.debug("Running standard consolidation")
                 strengthened = await asyncio.to_thread(

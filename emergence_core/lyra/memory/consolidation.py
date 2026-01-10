@@ -50,7 +50,10 @@ class MemoryConsolidator:
         deletion_threshold: float = 0.1,
         pattern_threshold: int = 3,
         association_boost: float = 0.1,
-        emotion_threshold: float = 0.7
+        emotion_threshold: float = 0.7,
+        max_retrieval_log_size: int = 1000,
+        min_retrieval_count_for_consolidation: int = 2,
+        min_age_hours_for_consolidation: float = 1.0
     ):
         """
         Initialize memory consolidator.
@@ -64,6 +67,9 @@ class MemoryConsolidator:
             pattern_threshold: Episodes for semantic transfer
             association_boost: Co-retrieval association boost
             emotion_threshold: Emotional intensity threshold
+            max_retrieval_log_size: Maximum entries in retrieval log
+            min_retrieval_count_for_consolidation: Minimum retrievals before consolidating working memory
+            min_age_hours_for_consolidation: Minimum age (hours) before consolidating working memory
         """
         self.storage = storage
         self.encoder = encoder
@@ -73,6 +79,9 @@ class MemoryConsolidator:
         self.pattern_threshold = pattern_threshold
         self.association_boost = association_boost
         self.emotion_threshold = emotion_threshold
+        self.max_retrieval_log_size = max_retrieval_log_size
+        self.min_retrieval_count = min_retrieval_count_for_consolidation
+        self.min_age_hours = min_age_hours_for_consolidation
         
         # In-memory retrieval log (id, timestamp, session_id)
         self.retrieval_log: List[Dict[str, Any]] = []
@@ -104,9 +113,9 @@ class MemoryConsolidator:
             "session_id": session_id or "default"
         })
         
-        # Keep log bounded (last 1000 retrievals)
-        if len(self.retrieval_log) > 1000:
-            self.retrieval_log = self.retrieval_log[-1000:]
+        # Keep log bounded with configurable size
+        if len(self.retrieval_log) > self.max_retrieval_log_size:
+            self.retrieval_log = self.retrieval_log[-self.max_retrieval_log_size:]
         
         logger.debug(f"Recorded retrieval: {memory_id}")
     
@@ -462,16 +471,16 @@ class MemoryConsolidator:
         """
         # Check retrieval frequency
         retrieval_count = entry.get("retrieval_count", 0)
-        if retrieval_count < 2:
+        if retrieval_count < self.min_retrieval_count:
             return False
         
-        # Check age (consolidate if older than 1 hour)
+        # Check age (consolidate if older than configured minimum age)
         created_at_str = entry.get("created_at")
         if created_at_str:
             try:
                 created_at = datetime.fromisoformat(created_at_str)
                 age_hours = (datetime.now() - created_at).total_seconds() / 3600
-                if age_hours < 1:
+                if age_hours < self.min_age_hours:
                     return False
             except (ValueError, TypeError):
                 pass
