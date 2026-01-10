@@ -447,3 +447,157 @@ class TestMemoryStorageExtensions:
         
         # Test would require actual ChromaDB initialization
         # Skip for now as it needs actual persistence setup
+
+
+class TestEdgeCases:
+    """Test edge cases and error handling."""
+    
+    def test_retrieve_with_none_workspace(self, cue_dependent_retrieval):
+        """Test retrieval with None workspace state."""
+        result = cue_dependent_retrieval.retrieve(None, limit=5)
+        assert result == []
+    
+    def test_retrieve_with_invalid_workspace(self, cue_dependent_retrieval):
+        """Test retrieval with invalid workspace state."""
+        result = cue_dependent_retrieval.retrieve("invalid", limit=5)
+        assert result == []
+    
+    def test_retrieve_with_zero_limit(self, cue_dependent_retrieval, mock_storage):
+        """Test retrieval with zero or negative limit."""
+        workspace_state = {"goals": [], "emotions": {}}
+        
+        mock_storage.query_episodic.return_value = {
+            "ids": [[]],
+            "documents": [[]],
+            "metadatas": [[]],
+            "distances": [[]]
+        }
+        
+        # Should use default limit of 5
+        result = cue_dependent_retrieval.retrieve(workspace_state, limit=0)
+        assert isinstance(result, list)
+    
+    def test_retrieve_with_negative_limit(self, cue_dependent_retrieval, mock_storage):
+        """Test retrieval with negative limit."""
+        workspace_state = {"goals": [], "emotions": {}}
+        
+        mock_storage.query_episodic.return_value = {
+            "ids": [[]],
+            "documents": [[]],
+            "metadatas": [[]],
+            "distances": [[]]
+        }
+        
+        result = cue_dependent_retrieval.retrieve(workspace_state, limit=-5)
+        assert isinstance(result, list)
+    
+    def test_encode_cues_with_mixed_types(self, cue_dependent_retrieval):
+        """Test cue extraction with mixed goal types."""
+        workspace_state = {
+            "goals": [
+                {"description": "goal 1"},
+                "goal 2",  # String instead of dict
+                None,  # None value
+                {"description": ""}  # Empty description
+            ],
+            "percepts": {},
+            "emotions": {}
+        }
+        
+        cue_text = cue_dependent_retrieval._encode_cues(workspace_state)
+        assert "goal 1" in cue_text
+        assert "goal 2" in cue_text
+    
+    def test_recency_weight_with_invalid_timestamp(self, cue_dependent_retrieval):
+        """Test recency weight with invalid timestamp."""
+        metadata = {"last_accessed": "invalid-timestamp"}
+        weight = cue_dependent_retrieval._recency_weight(metadata)
+        assert weight == 0.3  # Should return default
+    
+    def test_recency_weight_with_future_timestamp(self, cue_dependent_retrieval):
+        """Test recency weight with future timestamp."""
+        future = (datetime.now() + timedelta(hours=1)).isoformat()
+        metadata = {"last_accessed": future}
+        weight = cue_dependent_retrieval._recency_weight(metadata)
+        # Should handle gracefully (future timestamp gives weight > 1.0)
+        assert 0.0 <= weight <= 2.0  # Allow for slight time variance
+    
+    def test_competitive_retrieval_all_below_threshold(self, cue_dependent_retrieval):
+        """Test competitive retrieval when all activations below threshold."""
+        activations = {
+            "mem1": 0.2,
+            "mem2": 0.1,
+            "mem3": 0.05
+        }
+        
+        candidates = {
+            "mem1": {"data": {"content": "test1"}, "similarity": 0.5, "collection": "episodic"},
+            "mem2": {"data": {"content": "test2"}, "similarity": 0.4, "collection": "episodic"},
+            "mem3": {"data": {"content": "test3"}, "similarity": 0.3, "collection": "episodic"}
+        }
+        
+        retrieved = cue_dependent_retrieval._competitive_retrieval(
+            activations,
+            candidates,
+            limit=5
+        )
+        
+        # All below threshold (0.3), so nothing should be retrieved
+        assert len(retrieved) == 0
+    
+    def test_strengthen_retrieved_with_invalid_memory(self, cue_dependent_retrieval, mock_storage):
+        """Test strengthening with invalid memory data."""
+        memories = [
+            {"content": "test", "collection": "episodic"},  # Missing memory_id
+            {"memory_id": "mem1"}  # Missing collection
+        ]
+        
+        # Should handle gracefully without crashing
+        cue_dependent_retrieval._strengthen_retrieved(memories)
+        # No assertion needed - just verify it doesn't crash
+    
+    def test_spread_activation_with_no_associations(self, cue_dependent_retrieval, mock_storage):
+        """Test spreading activation when no associations exist."""
+        initial_activations = {
+            "mem1": 0.8,
+            "mem2": 0.6
+        }
+        
+        mock_storage.get_memory_associations.return_value = []
+        
+        spread = cue_dependent_retrieval._spread_activation(
+            initial_activations,
+            spread_factor=0.3,
+            iterations=2
+        )
+        
+        # Without associations, activations should remain the same
+        assert spread["mem1"] == 0.8
+        assert spread["mem2"] == 0.6
+    
+    def test_get_candidates_with_empty_results(self, cue_dependent_retrieval, mock_storage):
+        """Test candidate retrieval with empty results."""
+        mock_storage.episodic_memory.count.return_value = 0
+        mock_storage.semantic_memory.count.return_value = 0
+        
+        candidates = cue_dependent_retrieval._get_candidates("test query")
+        
+        assert len(candidates) == 0
+    
+    def test_get_candidates_with_malformed_json(self, cue_dependent_retrieval, mock_storage):
+        """Test candidate retrieval with malformed JSON."""
+        mock_storage.episodic_memory.count.return_value = 2
+        mock_storage.query_episodic.return_value = {
+            "ids": [["mem1", "mem2"]],
+            "documents": [["invalid json {", json.dumps({"content": "valid"})]],
+            "metadatas": [[{}, {}]],
+            "distances": [[0.2, 0.3]]
+        }
+        
+        mock_storage.semantic_memory.count.return_value = 0
+        
+        candidates = cue_dependent_retrieval._get_candidates("test query")
+        
+        # Should skip invalid JSON and return only valid entry
+        assert len(candidates) == 1
+        assert "mem2" in candidates
