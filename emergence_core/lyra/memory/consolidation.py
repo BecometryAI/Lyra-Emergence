@@ -86,8 +86,16 @@ class MemoryConsolidator:
             raise ValueError(f"deletion_threshold must be in [0.0, 1.0], got {deletion_threshold}")
         if pattern_threshold < 2:
             raise ValueError(f"pattern_threshold must be >= 2, got {pattern_threshold}")
+        if not (0.0 <= association_boost <= 1.0):
+            raise ValueError(f"association_boost must be in [0.0, 1.0], got {association_boost}")
+        if not (0.0 <= emotion_threshold <= 1.0):
+            raise ValueError(f"emotion_threshold must be in [0.0, 1.0], got {emotion_threshold}")
         if max_retrieval_log_size <= 0:
             raise ValueError(f"max_retrieval_log_size must be > 0, got {max_retrieval_log_size}")
+        if min_retrieval_count_for_consolidation < 1:
+            raise ValueError(f"min_retrieval_count_for_consolidation must be >= 1, got {min_retrieval_count_for_consolidation}")
+        if min_age_hours_for_consolidation <= 0:
+            raise ValueError(f"min_age_hours_for_consolidation must be > 0, got {min_age_hours_for_consolidation}")
         
         self.storage = storage
         self.encoder = encoder

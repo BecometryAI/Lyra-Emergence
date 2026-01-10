@@ -66,5 +66,3 @@ Access via: `scheduler.get_metrics_summary()`
 - All operations are non-blocking
 - Configurable parameters for tuning
 
-
-# Start background consolidation

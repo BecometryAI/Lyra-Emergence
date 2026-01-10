@@ -51,9 +51,6 @@ async def main():
             idle_detector.record_activity()
             await asyncio.sleep(0.5)
         
-        # Now let system go idle to trigger consolidation
-        print("\nSystem going idle... consolidation should run soon...")
-        
         print("\nSystem going idle... consolidation should run soon...")
         await asyncio.sleep(35)  # Wait for idle + consolidation
         

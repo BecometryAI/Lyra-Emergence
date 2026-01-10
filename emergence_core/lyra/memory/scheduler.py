@@ -104,10 +104,6 @@ class ConsolidationScheduler:
         self._task: Optional[asyncio.Task] = None
         
         logger.info(f"ConsolidationScheduler initialized (interval: {check_interval}s)")
-        logger.info(
-            f"ConsolidationScheduler initialized "
-            f"(check_interval: {check_interval}s)"
-        )
     
     async def start(self) -> None:
         """Start the consolidation scheduler."""
