@@ -36,12 +36,18 @@ class BehaviorLogger:
         Args:
             max_history: Maximum actions to keep in history
             config: Optional configuration dictionary
+        
+        Raises:
+            ValueError: If max_history is less than 1
         """
+        if max_history < 1:
+            raise ValueError("max_history must be at least 1")
+        
         self.action_history: deque = deque(maxlen=max_history)
         self.max_history = max_history
         self.config = config or {}
         
-        logger.info(f"✅ BehaviorLogger initialized (max_history={max_history})")
+        logger.debug(f"BehaviorLogger initialized (max_history={max_history})")
     
     def log_action(self, action: Any) -> None:
         """
@@ -50,13 +56,23 @@ class BehaviorLogger:
         Args:
             action: Action object or dictionary
         """
+        if action is None:
+            logger.debug("Skipping None action")
+            return
+        
         # Convert action to dict if needed
-        if hasattr(action, 'model_dump'):
-            action_dict = action.model_dump()
-        elif hasattr(action, '__dict__'):
-            action_dict = action.__dict__.copy()
-        else:
-            action_dict = dict(action) if isinstance(action, dict) else {'action': str(action)}
+        try:
+            if hasattr(action, 'model_dump'):
+                action_dict = action.model_dump()
+            elif hasattr(action, '__dict__'):
+                action_dict = action.__dict__.copy()
+            elif isinstance(action, dict):
+                action_dict = dict(action)
+            else:
+                action_dict = {'action': str(action)}
+        except Exception as e:
+            logger.debug(f"Could not convert action to dict: {e}")
+            action_dict = {'action': str(action)}
         
         # Add timestamp
         action_dict['logged_at'] = datetime.now().isoformat()

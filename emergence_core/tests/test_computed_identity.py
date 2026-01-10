@@ -578,5 +578,126 @@ class TestIdentityEmergence:
         assert tendencies.get("tendency_introspect", 0) > tendencies.get("tendency_speak", 0)
 
 
+class TestEdgeCases:
+    """Test edge cases and error handling."""
+    
+    def test_behavior_logger_invalid_max_history(self):
+        """Test BehaviorLogger rejects invalid max_history."""
+        with pytest.raises(ValueError):
+            BehaviorLogger(max_history=0)
+        
+        with pytest.raises(ValueError):
+            BehaviorLogger(max_history=-1)
+    
+    def test_identity_manager_update_with_none_systems(self):
+        """Test IdentityManager rejects None systems."""
+        manager = IdentityManager()
+        
+        with pytest.raises(ValueError):
+            manager.update(None, MockGoalSystem(), MockEmotionSystem())
+        
+        with pytest.raises(ValueError):
+            manager.update(MockMemorySystem(), None, MockEmotionSystem())
+        
+        with pytest.raises(ValueError):
+            manager.update(MockMemorySystem(), MockGoalSystem(), None)
+    
+    def test_identity_continuity_invalid_max_snapshots(self):
+        """Test IdentityContinuity rejects invalid max_snapshots."""
+        with pytest.raises(ValueError):
+            IdentityContinuity(max_snapshots=0)
+        
+        with pytest.raises(ValueError):
+            IdentityContinuity(max_snapshots=-5)
+    
+    def test_computed_identity_with_no_data(self):
+        """Test ComputedIdentity handles empty systems gracefully."""
+        memory = MockMemorySystem([])
+        goals = MockGoalSystem([])
+        emotions = MockEmotionSystem()
+        behavior = BehaviorLogger()
+        
+        identity = ComputedIdentity(memory, goals, emotions, behavior)
+        
+        # Should not crash, should return empty/default values
+        assert not identity.has_sufficient_data()
+        assert isinstance(identity.core_values, list)
+        assert isinstance(identity.emotional_disposition, dict)
+        assert isinstance(identity.behavioral_tendencies, dict)
+    
+    def test_behavior_logger_with_malformed_actions(self):
+        """Test BehaviorLogger handles malformed actions."""
+        logger = BehaviorLogger()
+        
+        # Test various malformed inputs
+        logger.log_action(None)  # Should handle None
+        logger.log_action("string_action")  # Should handle string
+        logger.log_action(123)  # Should handle int
+        logger.log_action({"incomplete": "data"})  # Missing type/priority
+        
+        # Should have logged all without crashing
+        assert len(logger.action_history) == 4
+    
+    def test_identity_manager_with_missing_config_file(self):
+        """Test IdentityManager handles missing config file gracefully."""
+        manager = IdentityManager(config_path="/nonexistent/path/config.json")
+        
+        # Should not crash, should use empty bootstrap
+        identity = manager.get_identity()
+        assert identity.source == "empty"
+    
+    def test_continuity_with_empty_snapshots(self):
+        """Test continuity calculations with no snapshots."""
+        continuity = IdentityContinuity()
+        
+        # Should handle empty state gracefully
+        score = continuity.get_continuity_score()
+        assert score == 1.0  # Perfect continuity with no data
+        
+        drift = continuity.get_identity_drift()
+        assert not drift["has_drift"]
+    
+    def test_self_defining_memories_with_missing_fields(self):
+        """Test self-defining memory calculation with incomplete data."""
+        memories = [
+            {"id": "m1"},  # Missing all scoring fields
+            {"id": "m2", "emotional_intensity": 0.8},  # Missing some fields
+            {"id": "m3", "emotional_intensity": 0.9, "retrieval_count": 10, "self_relevance": 0.9},
+        ]
+        
+        memory = MockMemorySystem(memories)
+        goals = MockGoalSystem()
+        emotions = MockEmotionSystem()
+        behavior = BehaviorLogger()
+        
+        identity = ComputedIdentity(memory, goals, emotions, behavior, 
+                                    config={"self_defining_threshold": 0.5})
+        
+        # Should handle missing fields with defaults
+        self_defining = identity.get_self_defining_memories()
+        assert isinstance(self_defining, list)
+    
+    def test_behavior_tendencies_with_empty_history(self):
+        """Test tendency analysis with no actions."""
+        logger = BehaviorLogger()
+        
+        tendencies = logger.analyze_tendencies()
+        assert tendencies == {}
+    
+    def test_value_inference_with_no_goals_or_actions(self):
+        """Test value inference when system has no goals or actions."""
+        memory = MockMemorySystem([])
+        goals = MockGoalSystem([])
+        emotions = MockEmotionSystem()
+        behavior = BehaviorLogger()
+        
+        identity = ComputedIdentity(memory, goals, emotions, behavior)
+        values = identity.core_values
+        
+        # Should return defaults when no data available
+        assert isinstance(values, list)
+        assert len(values) > 0  # Should have default values
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

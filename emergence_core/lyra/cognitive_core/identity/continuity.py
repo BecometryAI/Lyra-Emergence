@@ -58,11 +58,14 @@ class IdentityContinuity:
             max_snapshots: Maximum snapshots to keep in history
             config: Optional configuration dictionary
         """
+        if max_snapshots < 1:
+            raise ValueError("max_snapshots must be at least 1")
+        
         self.snapshots: List[IdentitySnapshot] = []
         self.max_snapshots = max_snapshots
         self.config = config or {}
         
-        logger.info(f"✅ IdentityContinuity initialized (max_snapshots={max_snapshots})")
+        logger.debug(f"IdentityContinuity initialized (max_snapshots={max_snapshots})")
     
     def take_snapshot(self, identity: Any) -> None:
         """

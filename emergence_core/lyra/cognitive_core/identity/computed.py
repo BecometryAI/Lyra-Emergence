@@ -104,40 +104,40 @@ class ComputedIdentity:
         self.behavior = behavior_log
         self.config = config or {}
         
-        # Thresholds for identity computation
+        # Configuration with defaults
         self.self_defining_threshold = self.config.get("self_defining_threshold", 0.7)
         self.min_data_points = self.config.get("min_data_points", 10)
         
-        logger.info("✅ ComputedIdentity initialized")
+        # Cache for computed properties to avoid recomputation
+        self._cache = {}
+        
+        logger.debug("ComputedIdentity initialized")
     
     def has_sufficient_data(self) -> bool:
         """
-        Check if we have enough data to compute meaningful identity.
+        Check if sufficient data exists to compute meaningful identity.
         
         Returns:
             True if sufficient data exists, False otherwise
         """
-        # Check if we have enough memories
+        memory_count = self._count_memories()
+        behavior_count = len(self.behavior.get_action_history()) if self.behavior else 0
+        total_data = memory_count + behavior_count
+        
+        return total_data >= self.min_data_points
+    
+    def _count_memories(self) -> int:
+        """Safely count available memories."""
+        if not self.memory:
+            return 0
+        
         try:
             if hasattr(self.memory, 'episodic') and hasattr(self.memory.episodic, 'storage'):
-                memory_count = self.memory.episodic.storage.count_episodic()
-            else:
-                memory_count = 0
+                return self.memory.episodic.storage.count_episodic()
         except Exception as e:
             logger.debug(f"Could not count memories: {e}")
-            memory_count = 0
         
-        # Check if we have behavior data
-        behavior_count = len(self.behavior.get_action_history()) if self.behavior else 0
-        
-        # Need at least min_data_points total
-        total_data = memory_count + behavior_count
-        has_data = total_data >= self.min_data_points
-        
-        logger.debug(f"Identity data check: {memory_count} memories, {behavior_count} behaviors, "
-                    f"total={total_data}, sufficient={has_data}")
-        
-        return has_data
+        return 0
     
     @property
     def core_values(self) -> List[str]:
@@ -245,31 +245,48 @@ class ComputedIdentity:
         Returns:
             List of memory dictionaries
         """
+        if not self.memory or not hasattr(self.memory, 'episodic'):
+            return []
+        
         try:
+            # Try direct get_all method first
             if hasattr(self.memory.episodic, 'get_all'):
                 return self.memory.episodic.get_all()
-            elif hasattr(self.memory.episodic, 'storage'):
-                # Use storage to query all memories
-                storage = self.memory.episodic.storage
-                if hasattr(storage, 'query_episodic'):
-                    results = storage.query_episodic("", n_results=100)
-                    # Convert to list of dicts
-                    memories = []
-                    for i in range(len(results.get('ids', [[]])[0])):
-                        memories.append({
-                            'id': results['ids'][0][i] if 'ids' in results else None,
-                            'content': results['documents'][0][i] if 'documents' in results else '',
-                            'metadata': results['metadatas'][0][i] if 'metadatas' in results else {},
-                            'emotional_intensity': results['metadatas'][0][i].get('emotional_intensity', 0.5) if 'metadatas' in results else 0.5,
-                            'retrieval_count': results['metadatas'][0][i].get('retrieval_count', 0) if 'metadatas' in results else 0,
-                            'self_relevance': results['metadatas'][0][i].get('self_relevance', 0.5) if 'metadatas' in results else 0.5,
-                            'timestamp': results['metadatas'][0][i].get('timestamp', 0) if 'metadatas' in results else 0,
-                        })
-                    return memories
+            
+            # Fall back to storage query
+            if hasattr(self.memory.episodic, 'storage'):
+                return self._query_storage_memories()
+            
             return []
         except Exception as e:
             logger.debug(f"Could not retrieve memories: {e}")
             return []
+    
+    def _query_storage_memories(self) -> List[Dict]:
+        """Query memories from storage and convert to standard format."""
+        storage = self.memory.episodic.storage
+        if not hasattr(storage, 'query_episodic'):
+            return []
+        
+        results = storage.query_episodic("", n_results=100)
+        ids = results.get('ids', [[]])[0]
+        documents = results.get('documents', [[]])[0]
+        metadatas = results.get('metadatas', [[]])[0]
+        
+        memories = []
+        for i in range(len(ids)):
+            metadata = metadatas[i] if i < len(metadatas) else {}
+            memories.append({
+                'id': ids[i],
+                'content': documents[i] if i < len(documents) else '',
+                'metadata': metadata,
+                'emotional_intensity': metadata.get('emotional_intensity', 0.5),
+                'retrieval_count': metadata.get('retrieval_count', 0),
+                'self_relevance': metadata.get('self_relevance', 0.5),
+                'timestamp': metadata.get('timestamp', 0),
+            })
+        
+        return memories
     
     def _analyze_goal_patterns(self) -> Dict[str, float]:
         """

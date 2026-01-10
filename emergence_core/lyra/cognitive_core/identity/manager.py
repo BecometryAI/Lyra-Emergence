@@ -51,15 +51,17 @@ class IdentityManager:
         """
         self.computed: Optional[ComputedIdentity] = None
         self.bootstrap_config: Optional[Dict] = None
+        self.config = config or {}
+        
+        # Initialize subsystems
         self.continuity = IdentityContinuity(config=config)
         self.behavior_log = BehaviorLogger(config=config)
-        self.config = config or {}
         
         # Load bootstrap config if provided
         if config_path:
             self.bootstrap_config = self._load_config(config_path)
         
-        logger.info("✅ IdentityManager initialized")
+        logger.debug("IdentityManager initialized")
     
     def get_identity(self) -> Identity:
         """
@@ -98,7 +100,13 @@ class IdentityManager:
             memory_system: Reference to memory system
             goal_system: Reference to goal/workspace system
             emotion_system: Reference to affect subsystem
+        
+        Raises:
+            ValueError: If any required system is None
         """
+        if memory_system is None or goal_system is None or emotion_system is None:
+            raise ValueError("All systems (memory, goal, emotion) must be provided")
+        
         # Create or update computed identity
         self.computed = ComputedIdentity(
             memory_system=memory_system,
@@ -108,12 +116,12 @@ class IdentityManager:
             config=self.config
         )
         
-        # Take identity snapshot for continuity tracking
+        # Take snapshot only if sufficient data
         if self.computed.has_sufficient_data():
             self.continuity.take_snapshot(self.computed)
-            logger.debug("Identity updated and snapshot taken")
+            logger.debug("Identity updated with snapshot")
         else:
-            logger.debug("Identity updated but insufficient data for snapshot")
+            logger.debug("Identity updated (insufficient data for snapshot)")
     
     def log_action(self, action: Any) -> None:
         """
