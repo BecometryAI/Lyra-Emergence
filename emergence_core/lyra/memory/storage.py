@@ -270,3 +270,137 @@ class MemoryStorage:
     def get_blockchain_count(self) -> int:
         """Get number of blocks in the blockchain."""
         return len(self.chain.chain) if hasattr(self.chain, 'chain') else 0
+    
+    def update_retrieval_metadata(self, doc_id: str, collection_type: str = "episodic") -> None:
+        """
+        Update retrieval metadata for a memory (retrieval count and last accessed time).
+        
+        Args:
+            doc_id: Memory document ID
+            collection_type: Type of collection ("episodic", "semantic", "procedural")
+        """
+        try:
+            # Select the appropriate collection
+            if collection_type == "episodic":
+                collection = self.episodic_memory
+            elif collection_type == "semantic":
+                collection = self.semantic_memory
+            elif collection_type == "procedural":
+                collection = self.procedural_memory
+            else:
+                logger.warning(f"Unknown collection type: {collection_type}")
+                return
+            
+            # Get current memory
+            result = collection.get(ids=[doc_id])
+            if not result["documents"] or not result["documents"][0]:
+                logger.warning(f"Memory {doc_id} not found in {collection_type} collection")
+                return
+            
+            # Update metadata
+            metadata = result["metadatas"][0] if result["metadatas"] else {}
+            metadata["retrieval_count"] = metadata.get("retrieval_count", 0) + 1
+            metadata["last_accessed"] = datetime.now().isoformat()
+            
+            # Update in collection
+            collection.update(
+                ids=[doc_id],
+                metadatas=[metadata]
+            )
+            
+            logger.debug(f"Updated retrieval metadata for {doc_id}: count={metadata['retrieval_count']}")
+            
+        except Exception as e:
+            logger.error(f"Failed to update retrieval metadata: {e}")
+    
+    def get_memory_associations(self, doc_id: str, collection_type: str = "episodic") -> List[tuple[str, float]]:
+        """
+        Get associated memories for a given memory.
+        
+        Args:
+            doc_id: Memory document ID
+            collection_type: Type of collection
+            
+        Returns:
+            List of (associated_id, strength) tuples
+        """
+        try:
+            # Select collection
+            if collection_type == "episodic":
+                collection = self.episodic_memory
+            elif collection_type == "semantic":
+                collection = self.semantic_memory
+            else:
+                collection = self.procedural_memory
+            
+            # Get memory
+            result = collection.get(ids=[doc_id])
+            if not result["metadatas"] or not result["metadatas"][0]:
+                return []
+            
+            metadata = result["metadatas"][0]
+            associations = metadata.get("associations", [])
+            
+            return associations
+            
+        except Exception as e:
+            logger.error(f"Failed to get associations: {e}")
+            return []
+    
+    def add_memory_association(
+        self,
+        doc_id: str,
+        associated_id: str,
+        strength: float = 1.0,
+        collection_type: str = "episodic"
+    ) -> None:
+        """
+        Add an association between two memories.
+        
+        Args:
+            doc_id: Source memory ID
+            associated_id: Associated memory ID
+            strength: Association strength (0.0-1.0)
+            collection_type: Type of collection
+        """
+        try:
+            # Select collection
+            if collection_type == "episodic":
+                collection = self.episodic_memory
+            elif collection_type == "semantic":
+                collection = self.semantic_memory
+            else:
+                collection = self.procedural_memory
+            
+            # Get current memory
+            result = collection.get(ids=[doc_id])
+            if not result["metadatas"] or not result["metadatas"][0]:
+                logger.warning(f"Memory {doc_id} not found")
+                return
+            
+            metadata = result["metadatas"][0]
+            associations = metadata.get("associations", [])
+            
+            # Add or update association
+            association_found = False
+            for i, (assoc_id, assoc_strength) in enumerate(associations):
+                if assoc_id == associated_id:
+                    associations[i] = (associated_id, strength)
+                    association_found = True
+                    break
+            
+            if not association_found:
+                associations.append((associated_id, strength))
+            
+            metadata["associations"] = associations
+            
+            # Update in collection
+            collection.update(
+                ids=[doc_id],
+                metadatas=[metadata]
+            )
+            
+            logger.debug(f"Added association: {doc_id} -> {associated_id} (strength={strength})")
+            
+        except Exception as e:
+            logger.error(f"Failed to add association: {e}")
