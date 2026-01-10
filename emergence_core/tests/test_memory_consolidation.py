@@ -11,14 +11,16 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import tempfile
 import shutil
+import sys
 
-from lyra.memory import (
-    MemoryStorage,
-    MemoryEncoder,
-    MemoryConsolidator,
-    IdleDetector,
-    ConsolidationScheduler,
-)
+# Add parent directory to path to import modules directly
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from lyra.memory.idle_detector import IdleDetector
+from lyra.memory.scheduler import ConsolidationScheduler, ConsolidationMetrics
+from lyra.memory.consolidation import MemoryConsolidator
+from lyra.memory.storage import MemoryStorage
+from lyra.memory.encoding import MemoryEncoder
 
 
 @pytest.fixture
@@ -51,7 +53,6 @@ def storage(temp_dirs):
 @pytest.fixture
 def encoder():
     """Create MemoryEncoder instance for testing."""
-    from lyra.memory import MemoryEncoder
     return MemoryEncoder()
 
 
