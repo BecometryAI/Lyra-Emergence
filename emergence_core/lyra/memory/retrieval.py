@@ -298,11 +298,21 @@ class CueDependentRetrieval:
         spread_factor: How much activation spreads to associates (default: 0.3)
     """
     
+    # Activation weight constants for clarity and easy tuning
+    SIMILARITY_WEIGHT = 0.5
+    RECENCY_WEIGHT = 0.2
+    EMOTIONAL_WEIGHT = 0.3
+    
+    # Default parameters
+    DEFAULT_RETRIEVAL_THRESHOLD = 0.3
+    DEFAULT_RECENCY_FALLBACK = 0.3
+    RECENCY_DECAY_RATE = 0.01  # λ in exponential decay (half-life ~69 hours)
+    
     def __init__(
         self,
         storage,
         emotional_weighting,
-        retrieval_threshold: float = 0.3,
+        retrieval_threshold: float = DEFAULT_RETRIEVAL_THRESHOLD,
         inhibition_strength: float = 0.4,
         strengthening_factor: float = 0.05,
         spread_factor: float = 0.3
@@ -353,17 +363,19 @@ class CueDependentRetrieval:
         Returns:
             List of retrieved memory dictionaries with activation scores
         """
-        if not workspace_state:
-            logger.warning("Empty workspace state provided")
+        # Input validation
+        if not workspace_state or not isinstance(workspace_state, dict):
+            logger.warning("Invalid workspace state provided")
             return []
         
-        logger.debug(f"Cue-dependent retrieval with workspace state")
+        if limit <= 0:
+            logger.warning(f"Invalid limit {limit}, using default of 5")
+            limit = 5
         
-        # Extract cues from workspace
+        logger.debug("Cue-dependent retrieval with workspace state")
+        
+        # Extract cues and get candidates
         cue_embeddings = self._encode_cues(workspace_state)
-        current_emotional_state = workspace_state.get("emotions", {})
-        
-        # Get candidate memories
         candidates = self._get_candidates(cue_embeddings)
         
         if not candidates:
@@ -371,34 +383,8 @@ class CueDependentRetrieval:
             return []
         
         # Compute initial activations
-        activations = {}
-        cue_similarities = []
-        
-        for memory_id, memory_data in candidates.items():
-            # Base activation from embedding similarity
-            similarity = memory_data.get("similarity", 0.5)
-            cue_similarities.append(similarity)
-            
-            # Recency boost (exponential decay)
-            recency = self._recency_weight(memory_data.get("metadata", {}))
-            
-            # Emotional congruence with current state
-            memory_emotional_state = memory_data.get("metadata", {}).get("emotional_state")
-            emotional_match = self.emotional_weighting.emotional_congruence_pad(
-                current_emotional_state,
-                memory_emotional_state
-            )
-            
-            # Combined activation (weighted sum)
-            activations[memory_id] = (
-                similarity * 0.5 +
-                recency * 0.2 +
-                emotional_match * 0.3
-            )
-        
-        # Update metrics
-        if cue_similarities:
-            self.metrics["avg_cue_similarity"] = sum(cue_similarities) / len(cue_similarities)
+        current_emotional_state = workspace_state.get("emotions", {})
+        activations = self._compute_activations(candidates, current_emotional_state)
         
         # Spreading activation
         if use_spreading:
@@ -419,6 +405,49 @@ class CueDependentRetrieval:
         
         logger.info(f"Retrieved {len(retrieved)} memories via cue-dependent retrieval")
         return retrieved
+    
+    def _compute_activations(
+        self,
+        candidates: Dict[str, Dict[str, Any]],
+        current_emotional_state: Dict[str, float]
+    ) -> Dict[str, float]:
+        """
+        Compute activation scores for candidate memories.
+        
+        Args:
+            candidates: Candidate memories
+            current_emotional_state: Current emotional state (PAD values)
+            
+        Returns:
+            Dictionary mapping memory_id to activation score
+        """
+        activations = {}
+        cue_similarities = []
+        
+        for memory_id, memory_data in candidates.items():
+            similarity = memory_data.get("similarity", 0.5)
+            cue_similarities.append(similarity)
+            
+            recency = self._recency_weight(memory_data.get("metadata", {}))
+            
+            memory_emotional_state = memory_data.get("metadata", {}).get("emotional_state")
+            emotional_match = self.emotional_weighting.emotional_congruence_pad(
+                current_emotional_state,
+                memory_emotional_state
+            )
+            
+            # Combined activation using class constants
+            activations[memory_id] = (
+                similarity * self.SIMILARITY_WEIGHT +
+                recency * self.RECENCY_WEIGHT +
+                emotional_match * self.EMOTIONAL_WEIGHT
+            )
+        
+        # Update metrics
+        if cue_similarities:
+            self.metrics["avg_cue_similarity"] = sum(cue_similarities) / len(cue_similarities)
+        
+        return activations
     
     def _encode_cues(self, workspace_state: Dict[str, Any]) -> str:
         """
@@ -487,69 +516,90 @@ class CueDependentRetrieval:
         
         try:
             # Query episodic memories
-            episodic_count = self.storage.episodic_memory.count()
-            if episodic_count > 0:
-                episodic_results = self.storage.query_episodic(
-                    query_texts=[cue_text],
-                    n_results=min(max_candidates, episodic_count)
+            candidates.update(
+                self._query_collection_candidates(
+                    "episodic",
+                    cue_text,
+                    max_candidates
                 )
-                
-                if episodic_results.get("documents") and episodic_results["documents"][0]:
-                    for i, (doc, metadata, distance) in enumerate(zip(
-                        episodic_results["documents"][0],
-                        episodic_results["metadatas"][0],
-                        episodic_results.get("distances", [[0.0] * len(episodic_results["documents"][0])])[0]
-                    )):
-                        try:
-                            memory_data = json.loads(doc) if isinstance(doc, str) else doc
-                            memory_id = episodic_results["ids"][0][i]
-                            
-                            # Convert distance to similarity (ChromaDB uses cosine distance)
-                            # Cosine distance = 1 - cosine_similarity, so similarity = 1 - distance
-                            similarity = 1.0 - distance
-                            
-                            candidates[memory_id] = {
-                                "data": memory_data,
-                                "metadata": metadata,
-                                "similarity": similarity,
-                                "collection": "episodic"
-                            }
-                        except (json.JSONDecodeError, KeyError) as e:
-                            logger.warning(f"Failed to parse candidate memory: {e}")
-                            continue
+            )
             
-            # Query semantic memories
-            semantic_count = self.storage.semantic_memory.count()
-            if semantic_count > 0 and len(candidates) < max_candidates:
+            # Query semantic memories if space remains
+            if len(candidates) < max_candidates:
                 remaining = max_candidates - len(candidates)
-                semantic_results = self.storage.query_semantic(
-                    query_texts=[cue_text],
-                    n_results=min(remaining, semantic_count)
+                candidates.update(
+                    self._query_collection_candidates(
+                        "semantic",
+                        cue_text,
+                        remaining
+                    )
                 )
-                
-                if semantic_results.get("documents") and semantic_results["documents"][0]:
-                    for i, (doc, metadata, distance) in enumerate(zip(
-                        semantic_results["documents"][0],
-                        semantic_results["metadatas"][0],
-                        semantic_results.get("distances", [[0.0] * len(semantic_results["documents"][0])])[0]
-                    )):
-                        try:
-                            memory_data = json.loads(doc) if isinstance(doc, str) else doc
-                            memory_id = semantic_results["ids"][0][i]
-                            similarity = 1.0 - distance
-                            
-                            candidates[memory_id] = {
-                                "data": memory_data,
-                                "metadata": metadata,
-                                "similarity": similarity,
-                                "collection": "semantic"
-                            }
-                        except (json.JSONDecodeError, KeyError) as e:
-                            logger.warning(f"Failed to parse candidate memory: {e}")
-                            continue
         
         except Exception as e:
             logger.error(f"Failed to get candidate memories: {e}")
+        
+        return candidates
+    
+    def _query_collection_candidates(
+        self,
+        collection_type: str,
+        cue_text: str,
+        max_results: int
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Query a specific collection for candidate memories.
+        
+        Args:
+            collection_type: "episodic" or "semantic"
+            cue_text: Query text
+            max_results: Maximum results to return
+            
+        Returns:
+            Dictionary of candidates from this collection
+        """
+        candidates = {}
+        
+        # Get collection and count
+        if collection_type == "episodic":
+            collection = self.storage.episodic_memory
+            query_method = self.storage.query_episodic
+        else:  # semantic
+            collection = self.storage.semantic_memory
+            query_method = self.storage.query_semantic
+        
+        count = collection.count()
+        if count == 0:
+            return candidates
+        
+        # Query collection
+        results = query_method(
+            query_texts=[cue_text],
+            n_results=min(max_results, count)
+        )
+        
+        # Process results
+        if not results.get("documents") or not results["documents"][0]:
+            return candidates
+        
+        for i, (doc, metadata, distance) in enumerate(zip(
+            results["documents"][0],
+            results["metadatas"][0],
+            results.get("distances", [[0.0] * len(results["documents"][0])])[0]
+        )):
+            try:
+                memory_data = json.loads(doc) if isinstance(doc, str) else doc
+                memory_id = results["ids"][0][i]
+                similarity = 1.0 - distance  # Convert distance to similarity
+                
+                candidates[memory_id] = {
+                    "data": memory_data,
+                    "metadata": metadata,
+                    "similarity": similarity,
+                    "collection": collection_type
+                }
+            except (json.JSONDecodeError, KeyError) as e:
+                logger.warning(f"Failed to parse candidate memory: {e}")
+                continue
         
         return candidates
     
@@ -565,30 +615,21 @@ class CueDependentRetrieval:
         Returns:
             Recency weight (0.0-1.0)
         """
-        # Get last access time or timestamp
         last_accessed_str = metadata.get("last_accessed") or metadata.get("timestamp")
         
         if not last_accessed_str:
-            return 0.3  # Default for memories without timestamp
+            return self.DEFAULT_RECENCY_FALLBACK
         
         try:
             last_accessed = datetime.fromisoformat(last_accessed_str)
-            now = datetime.now()
-            
-            # Calculate age in hours
-            age_seconds = (now - last_accessed).total_seconds()
-            age_hours = age_seconds / 3600.0
+            age_hours = (datetime.now() - last_accessed).total_seconds() / 3600.0
             
             # Exponential decay: weight = e^(-λ * age)
-            # Using λ = 0.01 gives half-life of ~69 hours
-            decay_rate = 0.01
-            recency = math.exp(-decay_rate * age_hours)
-            
-            return recency
+            return math.exp(-self.RECENCY_DECAY_RATE * age_hours)
             
         except (ValueError, TypeError) as e:
             logger.debug(f"Failed to parse timestamp: {e}")
-            return 0.3
+            return self.DEFAULT_RECENCY_FALLBACK
     
     def _spread_activation(
         self,
@@ -669,9 +710,6 @@ class CueDependentRetrieval:
         
         while len(retrieved) < limit and remaining:
             # Get highest activation
-            if not remaining:
-                break
-            
             best_id = max(remaining, key=remaining.get)
             best_activation = remaining[best_id]
             
@@ -692,33 +730,47 @@ class CueDependentRetrieval:
             del remaining[best_id]
             
             # Inhibit similar memories (interference)
-            best_embedding_similarity = candidates[best_id]["similarity"]
-            
-            for mem_id in list(remaining.keys()):
-                if mem_id not in candidates:
-                    continue
-                
-                # Calculate similarity between this memory and the best one
-                # Using embedding similarity as a proxy for memory similarity
-                mem_similarity = candidates[mem_id]["similarity"]
-                
-                # If both have high similarity to cues, they're likely similar to each other
-                # Simple heuristic: if both > 0.7, they're similar
-                if best_embedding_similarity > 0.7 and mem_similarity > 0.7:
-                    similarity = 0.8  # High similarity
-                elif best_embedding_similarity > 0.5 and mem_similarity > 0.5:
-                    similarity = 0.5  # Moderate similarity
-                else:
-                    similarity = 0.2  # Low similarity
-                
-                # Apply inhibition
-                inhibition = similarity * self.inhibition_strength
-                remaining[mem_id] -= inhibition
-                
-                if inhibition > 0.1:  # Only count significant interference
-                    self.metrics["interference_events"] += 1
+            self._apply_interference(remaining, candidates, best_id)
         
         return retrieved
+    
+    def _apply_interference(
+        self,
+        remaining: Dict[str, float],
+        candidates: Dict[str, Dict[str, Any]],
+        retrieved_id: str
+    ) -> None:
+        """
+        Apply interference from a retrieved memory to remaining candidates.
+        
+        Args:
+            remaining: Remaining activation values (modified in place)
+            candidates: Candidate memory data
+            retrieved_id: ID of the just-retrieved memory
+        """
+        retrieved_similarity = candidates[retrieved_id]["similarity"]
+        
+        for mem_id in list(remaining.keys()):
+            if mem_id not in candidates:
+                continue
+            
+            # Estimate similarity between memories based on cue similarity
+            # Simple heuristic: if both have high similarity to cues, they're likely similar
+            mem_similarity = candidates[mem_id]["similarity"]
+            
+            if retrieved_similarity > 0.7 and mem_similarity > 0.7:
+                similarity = 0.8  # High similarity
+            elif retrieved_similarity > 0.5 and mem_similarity > 0.5:
+                similarity = 0.5  # Moderate similarity
+            else:
+                similarity = 0.2  # Low similarity
+            
+            # Apply inhibition
+            inhibition = similarity * self.inhibition_strength
+            remaining[mem_id] -= inhibition
+            
+            if inhibition > 0.1:  # Only count significant interference
+                self.metrics["interference_events"] += 1
     
     def _strengthen_retrieved(self, memories: List[Dict[str, Any]]) -> None:
         """

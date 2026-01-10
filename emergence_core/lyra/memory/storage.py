@@ -271,43 +271,49 @@ class MemoryStorage:
         """Get number of blocks in the blockchain."""
         return len(self.chain.chain) if hasattr(self.chain, 'chain') else 0
     
+    def _get_collection(self, collection_type: str):
+        """
+        Get collection by type. Helper to reduce code duplication.
+        
+        Args:
+            collection_type: Type of collection ("episodic", "semantic", "procedural")
+            
+        Returns:
+            Collection object or None if invalid type
+        """
+        collections = {
+            "episodic": self.episodic_memory,
+            "semantic": self.semantic_memory,
+            "procedural": self.procedural_memory
+        }
+        collection = collections.get(collection_type)
+        if not collection:
+            logger.warning(f"Unknown collection type: {collection_type}")
+        return collection
+    
     def update_retrieval_metadata(self, doc_id: str, collection_type: str = "episodic") -> None:
         """
-        Update retrieval metadata for a memory (retrieval count and last accessed time).
+        Update retrieval metadata (count and last accessed time).
         
         Args:
             doc_id: Memory document ID
-            collection_type: Type of collection ("episodic", "semantic", "procedural")
+            collection_type: Collection type (episodic, semantic, procedural)
         """
+        collection = self._get_collection(collection_type)
+        if not collection:
+            return
+            
         try:
-            # Select the appropriate collection
-            if collection_type == "episodic":
-                collection = self.episodic_memory
-            elif collection_type == "semantic":
-                collection = self.semantic_memory
-            elif collection_type == "procedural":
-                collection = self.procedural_memory
-            else:
-                logger.warning(f"Unknown collection type: {collection_type}")
-                return
-            
-            # Get current memory
             result = collection.get(ids=[doc_id])
-            if not result["documents"] or not result["documents"][0]:
-                logger.warning(f"Memory {doc_id} not found in {collection_type} collection")
+            if not result.get("documents") or not result["documents"][0]:
+                logger.warning(f"Memory {doc_id} not found in {collection_type}")
                 return
             
-            # Update metadata
-            metadata = result["metadatas"][0] if result["metadatas"] else {}
+            metadata = result["metadatas"][0] if result.get("metadatas") else {}
             metadata["retrieval_count"] = metadata.get("retrieval_count", 0) + 1
             metadata["last_accessed"] = datetime.now().isoformat()
             
-            # Update in collection
-            collection.update(
-                ids=[doc_id],
-                metadatas=[metadata]
-            )
-            
+            collection.update(ids=[doc_id], metadatas=[metadata])
             logger.debug(f"Updated retrieval metadata for {doc_id}: count={metadata['retrieval_count']}")
             
         except Exception as e:
@@ -319,29 +325,21 @@ class MemoryStorage:
         
         Args:
             doc_id: Memory document ID
-            collection_type: Type of collection
+            collection_type: Collection type
             
         Returns:
             List of (associated_id, strength) tuples
         """
-        try:
-            # Select collection
-            if collection_type == "episodic":
-                collection = self.episodic_memory
-            elif collection_type == "semantic":
-                collection = self.semantic_memory
-            else:
-                collection = self.procedural_memory
+        collection = self._get_collection(collection_type)
+        if not collection:
+            return []
             
-            # Get memory
+        try:
             result = collection.get(ids=[doc_id])
-            if not result["metadatas"] or not result["metadatas"][0]:
+            if not result.get("metadatas") or not result["metadatas"][0]:
                 return []
             
-            metadata = result["metadatas"][0]
-            associations = metadata.get("associations", [])
-            
-            return associations
+            return result["metadatas"][0].get("associations", [])
             
         except Exception as e:
             logger.error(f"Failed to get associations: {e}")
@@ -361,45 +359,38 @@ class MemoryStorage:
             doc_id: Source memory ID
             associated_id: Associated memory ID
             strength: Association strength (0.0-1.0)
-            collection_type: Type of collection
+            collection_type: Collection type
         """
-        try:
-            # Select collection
-            if collection_type == "episodic":
-                collection = self.episodic_memory
-            elif collection_type == "semantic":
-                collection = self.semantic_memory
-            else:
-                collection = self.procedural_memory
+        if not 0.0 <= strength <= 1.0:
+            logger.warning(f"Invalid strength {strength}, must be 0.0-1.0")
+            return
             
-            # Get current memory
+        collection = self._get_collection(collection_type)
+        if not collection:
+            return
+            
+        try:
             result = collection.get(ids=[doc_id])
-            if not result["metadatas"] or not result["metadatas"][0]:
+            if not result.get("metadatas") or not result["metadatas"][0]:
                 logger.warning(f"Memory {doc_id} not found")
                 return
             
             metadata = result["metadatas"][0]
             associations = metadata.get("associations", [])
             
-            # Add or update association
-            association_found = False
-            for i, (assoc_id, assoc_strength) in enumerate(associations):
+            # Update existing or add new association
+            updated = False
+            for i, (assoc_id, _) in enumerate(associations):
                 if assoc_id == associated_id:
                     associations[i] = (associated_id, strength)
-                    association_found = True
+                    updated = True
                     break
             
-            if not association_found:
+            if not updated:
                 associations.append((associated_id, strength))
             
             metadata["associations"] = associations
-            
-            # Update in collection
-            collection.update(
-                ids=[doc_id],
-                metadatas=[metadata]
-            )
-            
+            collection.update(ids=[doc_id], metadatas=[metadata])
             logger.debug(f"Added association: {doc_id} -> {associated_id} (strength={strength})")
             
         except Exception as e:
