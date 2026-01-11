@@ -103,11 +103,15 @@ class ProcessingContext:
     
     def set_complexity(self, complexity: float):
         """Set the input complexity (0.0-1.0)."""
-        self.input_complexity = max(0.0, min(1.0, complexity))
+        if not isinstance(complexity, (int, float)):
+            raise TypeError(f"Complexity must be numeric, got {type(complexity)}")
+        self.input_complexity = max(0.0, min(1.0, float(complexity)))
     
     def set_quality(self, quality: float):
         """Set the output quality (0.0-1.0)."""
-        self.output_quality = max(0.0, min(1.0, quality))
+        if not isinstance(quality, (int, float)):
+            raise TypeError(f"Quality must be numeric, got {type(quality)}")
+        self.output_quality = max(0.0, min(1.0, float(quality)))
     
     def set_resources(self, resources: CognitiveResources):
         """Set the resources used."""
@@ -167,11 +171,13 @@ class PatternDetector:
             return []
         
         patterns = []
+        failures = [o for o in observations if not o.success]
+        
+        # Compute averages once
+        avg_success_complexity = sum(s.input_complexity for s in successes) / len(successes)
+        avg_failure_complexity = sum(f.input_complexity for f in failures) / len(failures) if failures else 1.0
         
         # Check if low complexity correlates with success
-        avg_success_complexity = sum(s.input_complexity for s in successes) / len(successes)
-        avg_failure_complexity = sum(o.input_complexity for o in observations if not o.success) / max(1, len([o for o in observations if not o.success]))
-        
         if avg_success_complexity < avg_failure_complexity * self.SUCCESS_COMPLEXITY_THRESHOLD:
             patterns.append(CognitivePattern(
                 pattern_type='success_condition',

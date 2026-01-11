@@ -552,5 +552,125 @@ class TestMetaCognitiveSystem:
         assert "attention_history" in summary
 
 
+class TestEdgeCases:
+    """Test edge cases and error handling."""
+    
+    def test_processing_context_invalid_complexity(self):
+        """Test invalid complexity values."""
+        monitor = MetaCognitiveMonitor()
+        
+        with pytest.raises(TypeError):
+            with monitor.observe("test") as ctx:
+                ctx.set_complexity("invalid")
+        
+        # Test boundary clamping
+        with monitor.observe("test") as ctx:
+            ctx.set_complexity(-1.0)
+            assert ctx.input_complexity == 0.0
+            
+        with monitor.observe("test") as ctx:
+            ctx.set_complexity(2.0)
+            assert ctx.input_complexity == 1.0
+    
+    def test_processing_context_invalid_quality(self):
+        """Test invalid quality values."""
+        monitor = MetaCognitiveMonitor()
+        
+        with pytest.raises(TypeError):
+            with monitor.observe("test") as ctx:
+                ctx.set_quality("invalid")
+    
+    def test_action_learner_invalid_inputs(self):
+        """Test action learner with invalid inputs."""
+        learner = ActionOutcomeLearner()
+        
+        # Empty action_id
+        with pytest.raises(ValueError):
+            learner.record_outcome("", "type", "intended", "actual", {})
+        
+        # Non-string action_type
+        with pytest.raises(ValueError):
+            learner.record_outcome("id", "", "intended", "actual", {})
+        
+        # Non-string intended
+        with pytest.raises(TypeError):
+            learner.record_outcome("id", "type", 123, "actual", {})
+        
+        # Non-dict context
+        with pytest.raises(TypeError):
+            learner.record_outcome("id", "type", "intended", "actual", "not_dict")
+    
+    def test_attention_history_invalid_inputs(self):
+        """Test attention history with invalid inputs."""
+        history = AttentionHistory()
+        
+        # Non-dict allocation
+        with pytest.raises(TypeError):
+            history.record_allocation("not_dict", "trigger", Mock())
+        
+        # Empty trigger
+        with pytest.raises(ValueError):
+            history.record_allocation({}, "", Mock())
+    
+    def test_empty_observations(self):
+        """Test behavior with no observations."""
+        monitor = MetaCognitiveMonitor()
+        
+        patterns = monitor.get_identified_patterns()
+        assert patterns == []
+        
+        stats = monitor.get_process_statistics("nonexistent")
+        assert stats.total_executions == 0
+    
+    def test_empty_action_outcomes(self):
+        """Test behavior with no action outcomes."""
+        learner = ActionOutcomeLearner()
+        
+        reliability = learner.get_action_reliability("nonexistent")
+        assert reliability.unknown is True
+        
+        prediction = learner.predict_outcome("nonexistent", {})
+        assert prediction.confidence == 0.0
+    
+    def test_memory_limits(self):
+        """Test that memory limits are respected."""
+        config = {"max_observations": 10}
+        monitor = MetaCognitiveMonitor(config=config)
+        
+        # Add more than max
+        for i in range(20):
+            with monitor.observe("test") as ctx:
+                ctx.set_complexity(0.5)
+        
+        assert len(monitor.observations) == 10
+    
+    def test_division_by_zero_protection(self):
+        """Test protection against division by zero."""
+        learner = ActionOutcomeLearner()
+        
+        # Record with empty strings
+        learner.record_outcome("id", "type", "", "", {})
+        
+        reliability = learner.get_action_reliability("type")
+        assert reliability.success_rate == 1.0  # Empty matches empty
+    
+    def test_concurrent_operations(self):
+        """Test thread-safety considerations."""
+        system = MetaCognitiveSystem()
+        
+        # Multiple rapid operations
+        for i in range(10):
+            with system.monitor.observe("test") as ctx:
+                ctx.set_complexity(0.5)
+            
+            system.action_learner.record_outcome(
+                f"action_{i}", "test", "intended", "actual", {}
+            )
+        
+        # Should not crash
+        assessment = system.get_self_assessment()
+        assert assessment is not None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -199,7 +199,13 @@ class AttentionHistory:
     def record_allocation(self, allocation: Dict[str, float],
                          trigger: str, workspace_state: Any) -> str:
         """Record an attention allocation."""
-        # Compute state hash
+        # Input validation
+        if not isinstance(allocation, dict):
+            raise TypeError("allocation must be a dictionary")
+        if not isinstance(trigger, str) or not trigger:
+            raise ValueError("trigger must be a non-empty string")
+        
+        # Compute state hash efficiently
         state_hash = str(hash(str(workspace_state)))
         
         record = AttentionAllocation(

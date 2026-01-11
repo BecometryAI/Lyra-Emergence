@@ -118,6 +118,18 @@ class ActionOutcomeLearner:
     def record_outcome(self, action_id: str, action_type: str,
                       intended: str, actual: str, context: Dict[str, Any]):
         """Record the outcome of an action."""
+        # Input validation
+        if not action_id or not isinstance(action_id, str):
+            raise ValueError("action_id must be a non-empty string")
+        if not action_type or not isinstance(action_type, str):
+            raise ValueError("action_type must be a non-empty string")
+        if not isinstance(intended, str):
+            raise TypeError("intended must be a string")
+        if not isinstance(actual, str):
+            raise TypeError("actual must be a string")
+        if not isinstance(context, dict):
+            raise TypeError("context must be a dictionary")
+        
         success = self._compare_outcomes(intended, actual)
         partial = self._compute_partial_success(intended, actual)
         side_effects = self._identify_side_effects(intended, actual, context)
