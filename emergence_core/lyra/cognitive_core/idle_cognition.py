@@ -109,6 +109,41 @@ class IdleCognition:
         logger.info(f"✅ IdleCognition initialized (memory_prob: {self.memory_review_probability}, "
                    f"goal_prob: {self.goal_evaluation_probability})")
     
+    def _create_percept(self, now: datetime, activity_type: str, prompt: str, 
+                       complexity: int, extra_raw: Optional[Dict] = None, 
+                       extra_meta: Optional[Dict] = None) -> Percept:
+        """
+        Create an idle activity percept.
+        
+        Args:
+            now: Current timestamp
+            activity_type: Type of activity
+            prompt: Activity prompt/description
+            complexity: Cognitive complexity (1-3)
+            extra_raw: Additional raw data
+            extra_meta: Additional metadata
+            
+        Returns:
+            Percept object for the idle activity
+        """
+        raw_data = {
+            "type": activity_type,
+            "prompt": prompt,
+            "triggered_at": now.isoformat()
+        }
+        if extra_raw:
+            raw_data.update(extra_raw)
+        
+        metadata = {
+            "source": "idle_cognition",
+            "activity_type": activity_type.replace("_trigger", "").replace("_check", "")
+        }
+        if extra_meta:
+            metadata.update(extra_meta)
+        
+        return Percept(modality="introspection", raw=raw_data, 
+                      complexity=complexity, metadata=metadata)
+    
     async def generate_idle_activity(self, workspace: 'GlobalWorkspace') -> List['Percept']:
         """
         Generate internal percepts during idle time.
@@ -122,31 +157,10 @@ class IdleCognition:
         activities = []
         now = datetime.now()
         
-        # Helper to create percept
-        def create_percept(activity_type: str, prompt: str, complexity: int, 
-                          extra_raw: Optional[Dict] = None, extra_meta: Optional[Dict] = None) -> Percept:
-            raw_data = {
-                "type": activity_type,
-                "prompt": prompt,
-                "triggered_at": now.isoformat()
-            }
-            if extra_raw:
-                raw_data.update(extra_raw)
-            
-            metadata = {
-                "source": "idle_cognition",
-                "activity_type": activity_type.replace("_trigger", "").replace("_check", "")
-            }
-            if extra_meta:
-                metadata.update(extra_meta)
-            
-            return Percept(modality="introspection", raw=raw_data, 
-                          complexity=complexity, metadata=metadata)
-        
         # 1. Memory review trigger
         if self._should_review_memories(now):
-            activities.append(create_percept(
-                "memory_review_trigger", 
+            activities.append(self._create_percept(
+                now, "memory_review_trigger", 
                 "Review and consolidate recent experiences", 
                 2
             ))
@@ -156,8 +170,8 @@ class IdleCognition:
         # 2. Goal evaluation trigger
         if self._should_evaluate_goals(now):
             current_goals = workspace.current_goals if hasattr(workspace, 'current_goals') else []
-            activities.append(create_percept(
-                "goal_evaluation_trigger",
+            activities.append(self._create_percept(
+                now, "goal_evaluation_trigger",
                 "Evaluate progress on current goals",
                 2,
                 extra_raw={"goal_count": len(current_goals)},
@@ -175,8 +189,8 @@ class IdleCognition:
                 "What have I learned recently?",
                 "What patterns do I notice in my behavior?"
             ]
-            activities.append(create_percept(
-                "spontaneous_reflection",
+            activities.append(self._create_percept(
+                now, "spontaneous_reflection",
                 random.choice(reflection_prompts),
                 3
             ))
@@ -184,8 +198,8 @@ class IdleCognition:
         
         # 4. Temporal awareness check
         if random.random() < self.temporal_check_probability:
-            activities.append(create_percept(
-                "temporal_awareness_check",
+            activities.append(self._create_percept(
+                now, "temporal_awareness_check",
                 "Check temporal context and time passage",
                 1,
                 extra_raw={"current_time": now.isoformat()}
@@ -195,8 +209,8 @@ class IdleCognition:
         
         # 5. Emotional state monitoring
         if random.random() < self.emotional_check_probability:
-            activities.append(create_percept(
-                "emotional_state_check",
+            activities.append(self._create_percept(
+                now, "emotional_state_check",
                 "Monitor and evaluate current emotional state",
                 2
             ))
