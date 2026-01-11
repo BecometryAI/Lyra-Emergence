@@ -98,10 +98,10 @@ class GoalInteraction:
         facilitation = 0.0
         
         # Shared subgoals create facilitation
-        subgoals1, subgoals2 = self._get_subgoals(g1), self._get_subgoals(g2)
-        if subgoals1 and subgoals2:
-            shared = subgoals1 & subgoals2
-            total_unique = len(subgoals1 | subgoals2)
+        g1_subgoals, g2_subgoals = self._get_subgoals(g1), self._get_subgoals(g2)
+        if g1_subgoals and g2_subgoals:
+            shared = g1_subgoals & g2_subgoals
+            total_unique = len(g1_subgoals | g2_subgoals)
             if total_unique > 0:
                 facilitation += (len(shared) / total_unique) * 0.5
         
@@ -161,7 +161,12 @@ class GoalInteraction:
         return None
     
     def _outcomes_conflict(self, g1: Any, g2: Any) -> bool:
-        """Check if goals have contradictory outcomes."""
+        """
+        Check if goals have contradictory outcomes.
+        
+        Note: Previously included string-based outcome conflict detection,
+        but removed for robustness. Now relies on explicit metadata only.
+        """
         # Check metadata for explicit conflicts
         if hasattr(g1, 'metadata') and isinstance(g1.metadata, dict):
             g2_id = self._get_goal_id(g2)
@@ -170,7 +175,7 @@ class GoalInteraction:
             if g2_id in g1.metadata.get('mutually_exclusive_with', []):
                 return True
         
-        return False  # Removed complex string-based conflict detection for robustness
+        return False
     
     def _are_compatible_types(self, g1: Any, g2: Any) -> bool:
         """Check if goals have compatible types that work well together."""

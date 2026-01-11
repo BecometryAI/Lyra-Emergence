@@ -85,7 +85,7 @@ class GoalCompetition:
             Dict mapping goal IDs to final activation levels
             
         Raises:
-            ValueError: If iterations < 1
+            ValueError: If iterations < 1 or goals have invalid attributes
         """
         if iterations < 1:
             raise ValueError(f"iterations must be >= 1, got {iterations}")
@@ -93,11 +93,14 @@ class GoalCompetition:
         if not goals:
             return {}
         
-        # Initialize activations
-        activations = {self._get_goal_id(g): self._initial_activation(g) for g in goals}
+        # Precompute and validate goal data before entering competition loop
+        try:
+            goal_data = [(g, self._get_goal_id(g), self._get_goal_importance(g)) for g in goals]
+        except (ValueError, AttributeError) as e:
+            raise ValueError(f"Invalid goal in competition: {e}")
         
-        # Precompute goal IDs and conflicts for efficiency
-        goal_data = [(g, self._get_goal_id(g), self._get_goal_importance(g)) for g in goals]
+        # Initialize activations
+        activations = {goal_id: self._initial_activation(g) for g, goal_id, _ in goal_data}
         
         # Run competition dynamics
         for _ in range(iterations):
