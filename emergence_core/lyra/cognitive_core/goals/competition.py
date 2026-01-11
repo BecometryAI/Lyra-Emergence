@@ -11,7 +11,10 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime
 import logging
 
-from .resources import CognitiveResources, ResourcePool
+try:
+    from .resources import CognitiveResources, ResourcePool
+except ImportError:
+    from resources import CognitiveResources, ResourcePool
 
 logger = logging.getLogger(__name__)
 

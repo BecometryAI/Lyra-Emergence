@@ -8,6 +8,11 @@ and facilitation, tracking relationships that affect goal pursuit.
 from typing import Dict, Tuple, List, Set, Any
 import logging
 
+try:
+    from .resources import CognitiveResources
+except ImportError:
+    from resources import CognitiveResources
+
 logger = logging.getLogger(__name__)
 
 
@@ -193,7 +198,6 @@ class GoalInteraction:
         elif isinstance(goal, dict) and 'resource_needs' in goal:
             needs = goal['resource_needs']
             if isinstance(needs, dict):
-                from .resources import CognitiveResources
                 return CognitiveResources(**needs)
             return needs
         return None
