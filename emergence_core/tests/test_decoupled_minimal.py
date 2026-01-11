@@ -9,14 +9,11 @@ import pytest
 import asyncio
 import time
 from datetime import datetime
-import sys
-import os
+from unittest.mock import MagicMock
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
-
-from lyra.cognitive_core.input_queue import InputQueue, InputEvent, InputSource
-from lyra.cognitive_core.idle_cognition import IdleCognition
+# Use standard imports instead of sys.path manipulation
+from emergence_core.lyra.cognitive_core.input_queue import InputQueue, InputEvent, InputSource
+from emergence_core.lyra.cognitive_core.idle_cognition import IdleCognition
 
 
 class MockWorkspace:
@@ -182,11 +179,11 @@ class TestIdleCognition:
         assert "total_cycles" in idle.stats
     
     @pytest.mark.asyncio
-    async def test_generate_idle_activity(self):
+    async def test_generate_idle_activity(self, monkeypatch):
         """Test that idle cognition generates activities."""
-        # Patch the Percept import
-        import lyra.cognitive_core.idle_cognition as ic_module
-        ic_module.Percept = MockPercept
+        # Use monkeypatch to replace Percept at module level
+        mock_percept_class = MockPercept
+        monkeypatch.setattr('emergence_core.lyra.cognitive_core.idle_cognition.Percept', mock_percept_class)
         
         idle = IdleCognition(config={
             "memory_review_probability": 1.0,  # Always trigger
@@ -204,11 +201,11 @@ class TestIdleCognition:
         assert all(isinstance(p, MockPercept) for p in activities)
     
     @pytest.mark.asyncio
-    async def test_idle_activity_types(self):
+    async def test_idle_activity_types(self, monkeypatch):
         """Test different types of idle activities."""
-        # Patch the Percept import
-        import lyra.cognitive_core.idle_cognition as ic_module
-        ic_module.Percept = MockPercept
+        # Use monkeypatch to replace Percept at module level
+        mock_percept_class = MockPercept
+        monkeypatch.setattr('emergence_core.lyra.cognitive_core.idle_cognition.Percept', mock_percept_class)
         
         idle = IdleCognition(config={
             "memory_review_probability": 1.0,
@@ -229,11 +226,11 @@ class TestIdleCognition:
         assert percept.metadata["activity_type"] == "memory_review"
     
     @pytest.mark.asyncio
-    async def test_idle_cognition_respects_intervals(self):
+    async def test_idle_cognition_respects_intervals(self, monkeypatch):
         """Test that minimum intervals are respected."""
-        # Patch the Percept import
-        import lyra.cognitive_core.idle_cognition as ic_module
-        ic_module.Percept = MockPercept
+        # Use monkeypatch to replace Percept at module level
+        mock_percept_class = MockPercept
+        monkeypatch.setattr('emergence_core.lyra.cognitive_core.idle_cognition.Percept', mock_percept_class)
         
         idle = IdleCognition(config={
             "memory_review_probability": 1.0,
@@ -255,11 +252,11 @@ class TestIdleCognition:
         assert len(memory_reviews2) == 0
     
     @pytest.mark.asyncio
-    async def test_idle_cognition_tracks_stats(self):
+    async def test_idle_cognition_tracks_stats(self, monkeypatch):
         """Test that statistics are tracked correctly."""
-        # Patch the Percept import
-        import lyra.cognitive_core.idle_cognition as ic_module
-        ic_module.Percept = MockPercept
+        # Use monkeypatch to replace Percept at module level
+        mock_percept_class = MockPercept
+        monkeypatch.setattr('emergence_core.lyra.cognitive_core.idle_cognition.Percept', mock_percept_class)
         
         idle = IdleCognition(config={
             "memory_review_probability": 1.0,
@@ -298,11 +295,11 @@ class TestAcceptanceCriteria:
         assert elapsed < 0.01  # Should be nearly instant
     
     @pytest.mark.asyncio
-    async def test_idle_cognition_generates_activity(self):
+    async def test_idle_cognition_generates_activity(self, monkeypatch):
         """Verify idle cognition produces internal percepts."""
-        # Patch the Percept import
-        import lyra.cognitive_core.idle_cognition as ic_module
-        ic_module.Percept = MockPercept
+        # Use monkeypatch to replace Percept at module level
+        mock_percept_class = MockPercept
+        monkeypatch.setattr('emergence_core.lyra.cognitive_core.idle_cognition.Percept', mock_percept_class)
         
         idle = IdleCognition(config={
             "memory_review_probability": 0.5,

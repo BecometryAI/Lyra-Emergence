@@ -21,8 +21,8 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime
-from typing import List, Optional, Any
-from dataclasses import dataclass
+from typing import List, Optional, Any, Union, Dict
+from dataclasses import dataclass, field
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -42,18 +42,17 @@ class InputEvent:
     Represents an input event from an external source.
     
     Attributes:
-        text: The input text content
+        text: The input content (text string or structured data)
         modality: Type of input ("text", "image", "audio")
         source: Where the input came from
         timestamp: When the input was received
         metadata: Additional context about the input
     """
-    text: Any
+    text: Union[str, Dict[str, Any]]
     modality: str = "text"
     source: str = "human"
-    timestamp: datetime = None
-    metadata: dict = None
-    
+    timestamp: Optional[datetime] = None
+    metadata: Optional[Dict[str, Any]] = None
     def __post_init__(self):
         """Initialize default values."""
         if self.timestamp is None:

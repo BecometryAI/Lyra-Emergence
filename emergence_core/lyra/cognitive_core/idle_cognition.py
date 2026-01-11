@@ -29,6 +29,9 @@ from datetime import datetime, timedelta
 
 if TYPE_CHECKING:
     from .workspace import GlobalWorkspace, WorkspaceSnapshot, Percept
+else:
+    # Import at module level when not type checking for runtime performance
+    from .workspace import Percept
 
 logger = logging.getLogger(__name__)
 
@@ -127,8 +130,6 @@ class IdleCognition:
         Returns:
             List of internal Percept objects representing idle activities
         """
-        from .workspace import Percept
-        
         self.cycle_count += 1
         self.stats["total_cycles"] += 1
         
