@@ -94,17 +94,6 @@ class PatternDetector:
         self._cached_patterns = patterns
         self._cache_dirty = False
         return patterns
-            if len(observations) < self.min_observations:
-                continue
-            
-            patterns.extend(self._detect_success_conditions(process_type, observations))
-            patterns.extend(self._detect_failure_modes(process_type, observations))
-            patterns.extend(self._detect_efficiency_factors(process_type, observations))
-        
-        self._cached_patterns = patterns
-        self._cache_dirty = False
-        
-        return patterns
     
     def _detect_success_conditions(
         self,
