@@ -78,9 +78,11 @@ class InputQueue:
     Attributes:
         _queue: Underlying asyncio.Queue for thread-safe operations
         max_size: Maximum number of queued inputs
-        total_inputs_received: Count of all inputs ever received
         stats: Statistics about input processing
     """
+    
+    # Valid modality values
+    VALID_MODALITIES = {"text", "image", "audio", "introspection"}
     
     def __init__(self, max_size: int = 100):
         """
@@ -88,10 +90,15 @@ class InputQueue:
         
         Args:
             max_size: Maximum queue size (default: 100)
+            
+        Raises:
+            ValueError: If max_size <= 0
         """
+        if max_size <= 0:
+            raise ValueError(f"max_size must be positive, got {max_size}")
+            
         self._queue: asyncio.Queue = asyncio.Queue(maxsize=max_size)
         self.max_size = max_size
-        self.total_inputs_received = 0
         
         # Statistics
         self.stats = {
@@ -104,26 +111,31 @@ class InputQueue:
     
     async def add_input(
         self, 
-        text: Any, 
+        text: Union[str, Dict[str, Any]], 
         modality: str = "text",
         source: str = "human",
-        metadata: Optional[dict] = None
+        metadata: Optional[Dict[str, Any]] = None
     ) -> bool:
         """
         Add input to queue (called by external interface).
         
-        This is the entry point for all external input to the cognitive system.
-        Input is queued and will be processed in the next cognitive cycle.
-        
         Args:
-            text: The input content (text, data, etc.)
-            modality: Type of input ("text", "image", "audio")
+            text: The input content (text string or structured data)
+            modality: Type of input ("text", "image", "audio", "introspection")
             source: Where the input came from
             metadata: Additional context about the input
             
         Returns:
             True if input was queued successfully, False if queue was full
+            
+        Raises:
+            ValueError: If modality is not valid
         """
+        if modality not in self.VALID_MODALITIES:
+            logger.warning(f"Invalid modality '{modality}', using 'text'. "
+                         f"Valid: {self.VALID_MODALITIES}")
+            modality = "text"
+        
         event = InputEvent(
             text=text,
             modality=modality,
@@ -134,7 +146,6 @@ class InputQueue:
         
         try:
             self._queue.put_nowait(event)
-            self.total_inputs_received += 1
             self.stats["total_received"] += 1
             
             # Track by source
@@ -142,7 +153,8 @@ class InputQueue:
                 self.stats["by_source"][source] = 0
             self.stats["by_source"][source] += 1
             
-            logger.debug(f"📥 Queued input from {source}: {str(text)[:50]}...")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"📥 Queued input from {source}: {str(text)[:50]}...")
             return True
             
         except asyncio.QueueFull:
@@ -171,7 +183,7 @@ class InputQueue:
             except asyncio.QueueEmpty:
                 break
         
-        if inputs:
+        if inputs and logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"📥 Retrieved {len(inputs)} pending inputs")
         
         return inputs

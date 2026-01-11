@@ -164,6 +164,27 @@ class TestInputQueue:
         assert cleared == 3
         assert queue.is_empty()
         assert queue.size() == 0
+    
+    def test_input_queue_validation(self):
+        """Test that invalid max_size raises error."""
+        with pytest.raises(ValueError, match="max_size must be positive"):
+            InputQueue(max_size=0)
+        
+        with pytest.raises(ValueError, match="max_size must be positive"):
+            InputQueue(max_size=-1)
+    
+    @pytest.mark.asyncio
+    async def test_invalid_modality_handling(self):
+        """Test that invalid modality is handled gracefully."""
+        queue = InputQueue()
+        
+        # Should accept with warning and default to 'text'
+        result = await queue.add_input("Test", modality="invalid_type")
+        
+        assert result is True
+        inputs = queue.get_pending_inputs()
+        assert len(inputs) == 1
+        assert inputs[0].modality == "text"  # Should default to text
 
 
 class TestIdleCognition:

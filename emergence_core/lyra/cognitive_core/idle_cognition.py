@@ -113,20 +113,6 @@ class IdleCognition:
         """
         Generate internal percepts during idle time.
         
-        This is called by the cognitive loop when there is no external input.
-        It probabilistically generates various types of internal activities
-        that manifest as percepts for the cognitive system to process.
-        
-        Possible idle activities:
-        - Memory review and consolidation triggers
-        - Goal progress evaluation prompts
-        - Spontaneous reflection seeds
-        - Temporal awareness updates
-        - Emotional state monitoring
-        
-        Args:
-            workspace: Current GlobalWorkspace state
-            
         Returns:
             List of internal Percept objects representing idle activities
         """
@@ -136,50 +122,49 @@ class IdleCognition:
         activities = []
         now = datetime.now()
         
+        # Helper to create percept
+        def create_percept(activity_type: str, prompt: str, complexity: int, 
+                          extra_raw: Optional[Dict] = None, extra_meta: Optional[Dict] = None) -> Percept:
+            raw_data = {
+                "type": activity_type,
+                "prompt": prompt,
+                "triggered_at": now.isoformat()
+            }
+            if extra_raw:
+                raw_data.update(extra_raw)
+            
+            metadata = {
+                "source": "idle_cognition",
+                "activity_type": activity_type.replace("_trigger", "").replace("_check", "")
+            }
+            if extra_meta:
+                metadata.update(extra_meta)
+            
+            return Percept(modality="introspection", raw=raw_data, 
+                          complexity=complexity, metadata=metadata)
+        
         # 1. Memory review trigger
         if self._should_review_memories(now):
-            percept = Percept(
-                modality="introspection",
-                raw={
-                    "type": "memory_review_trigger",
-                    "prompt": "Review and consolidate recent experiences",
-                    "triggered_at": now.isoformat()
-                },
-                complexity=2,
-                metadata={
-                    "source": "idle_cognition",
-                    "activity_type": "memory_review"
-                }
-            )
-            activities.append(percept)
+            activities.append(create_percept(
+                "memory_review_trigger", 
+                "Review and consolidate recent experiences", 
+                2
+            ))
             self.last_memory_review = now
             self.stats["memory_reviews"] += 1
-            logger.debug("💭 Generated memory review trigger")
         
         # 2. Goal evaluation trigger
         if self._should_evaluate_goals(now):
-            # Check current goals
             current_goals = workspace.current_goals if hasattr(workspace, 'current_goals') else []
-            
-            percept = Percept(
-                modality="introspection",
-                raw={
-                    "type": "goal_evaluation_trigger",
-                    "prompt": "Evaluate progress on current goals",
-                    "goal_count": len(current_goals),
-                    "triggered_at": now.isoformat()
-                },
-                complexity=2,
-                metadata={
-                    "source": "idle_cognition",
-                    "activity_type": "goal_evaluation",
-                    "goal_ids": [g.id for g in current_goals[:5]]  # First 5 goals
-                }
-            )
-            activities.append(percept)
+            activities.append(create_percept(
+                "goal_evaluation_trigger",
+                "Evaluate progress on current goals",
+                2,
+                extra_raw={"goal_count": len(current_goals)},
+                extra_meta={"goal_ids": [g.id for g in current_goals[:5]]}
+            ))
             self.last_goal_evaluation = now
             self.stats["goal_evaluations"] += 1
-            logger.debug(f"🎯 Generated goal evaluation trigger ({len(current_goals)} goals)")
         
         # 3. Spontaneous reflection
         if random.random() < self.reflection_probability:
@@ -190,63 +175,32 @@ class IdleCognition:
                 "What have I learned recently?",
                 "What patterns do I notice in my behavior?"
             ]
-            
-            percept = Percept(
-                modality="introspection",
-                raw={
-                    "type": "spontaneous_reflection",
-                    "prompt": random.choice(reflection_prompts),
-                    "triggered_at": now.isoformat()
-                },
-                complexity=3,
-                metadata={
-                    "source": "idle_cognition",
-                    "activity_type": "reflection"
-                }
-            )
-            activities.append(percept)
+            activities.append(create_percept(
+                "spontaneous_reflection",
+                random.choice(reflection_prompts),
+                3
+            ))
             self.stats["reflections"] += 1
-            logger.debug("🤔 Generated spontaneous reflection")
         
         # 4. Temporal awareness check
         if random.random() < self.temporal_check_probability:
-            percept = Percept(
-                modality="introspection",
-                raw={
-                    "type": "temporal_awareness_check",
-                    "prompt": "Check temporal context and time passage",
-                    "current_time": now.isoformat(),
-                    "triggered_at": now.isoformat()
-                },
-                complexity=1,
-                metadata={
-                    "source": "idle_cognition",
-                    "activity_type": "temporal_check"
-                }
-            )
-            activities.append(percept)
+            activities.append(create_percept(
+                "temporal_awareness_check",
+                "Check temporal context and time passage",
+                1,
+                extra_raw={"current_time": now.isoformat()}
+            ))
             self.last_temporal_check = now
             self.stats["temporal_checks"] += 1
-            logger.debug("⏰ Generated temporal awareness check")
         
         # 5. Emotional state monitoring
         if random.random() < self.emotional_check_probability:
-            percept = Percept(
-                modality="introspection",
-                raw={
-                    "type": "emotional_state_check",
-                    "prompt": "Monitor and evaluate current emotional state",
-                    "triggered_at": now.isoformat()
-                },
-                complexity=2,
-                metadata={
-                    "source": "idle_cognition",
-                    "activity_type": "emotional_check"
-                }
-            )
-            activities.append(percept)
+            activities.append(create_percept(
+                "emotional_state_check",
+                "Monitor and evaluate current emotional state",
+                2
+            ))
             self.stats["emotional_checks"] += 1
-            logger.debug("💚 Generated emotional state check")
         
         return activities
     
