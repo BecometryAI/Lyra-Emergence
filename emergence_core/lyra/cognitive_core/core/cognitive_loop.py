@@ -144,6 +144,10 @@ class CognitiveLoop:
         # Update temporal awareness - record that interaction occurred
         self.subsystems.temporal_awareness.update_last_interaction_time()
         
+        # Record input in communication drive system
+        if hasattr(self.subsystems, 'communication_drives'):
+            self.subsystems.communication_drives.record_input()
+        
         # Update new temporal grounding system
         if hasattr(self.subsystems, 'temporal_grounding'):
             temporal_context = self.subsystems.temporal_grounding.on_interaction()

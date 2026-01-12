@@ -152,6 +152,13 @@ class SubsystemCoordinator:
             config=config.get("introspective_loop", {})
         )
         
+        # Initialize communication drive system with validated config
+        from ..communication import CommunicationDriveSystem
+        self.communication_drives = CommunicationDriveSystem(
+            config=config.get("communication", {})
+        )
+        logger.debug("💬 Communication drive system initialized")
+        
         # Initialize LLM clients for language interfaces
         self._initialize_llm_clients()
         
