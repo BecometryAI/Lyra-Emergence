@@ -100,6 +100,10 @@ class ActionExecutor:
                 "timestamp": datetime.now()
             })
             logger.info(f"🗣️ Lyra: {response[:100]}...")
+            
+            # Record output in communication drive system
+            if hasattr(self.subsystems, 'communication_drives'):
+                self.subsystems.communication_drives.record_output()
         except Exception as e:
             logger.error(f"Failed to execute SPEAK action: {e}", exc_info=True)
     
@@ -135,6 +139,10 @@ class ActionExecutor:
                 "timestamp": datetime.now()
             })
             logger.info(f"🗣️💭 Lyra (autonomous): {response[:100]}...")
+            
+            # Record output in communication drive system
+            if hasattr(self.subsystems, 'communication_drives'):
+                self.subsystems.communication_drives.record_output()
         except Exception as e:
             logger.error(f"Failed to execute SPEAK_AUTONOMOUS action: {e}", exc_info=True)
     

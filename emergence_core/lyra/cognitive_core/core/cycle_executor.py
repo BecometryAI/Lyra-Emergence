@@ -160,6 +160,15 @@ class CycleExecutor:
             meta_percepts = []
             subsystem_timings['meta_cognition'] = 0.0
         
+        # 6.5 COMMUNICATION DRIVES: Compute internal urges to communicate
+        try:
+            step_start = time.time()
+            await self._compute_communication_drives()
+            subsystem_timings['communication_drives'] = (time.time() - step_start) * 1000
+        except Exception as e:
+            logger.error(f"Communication drives step failed: {e}", exc_info=True)
+            subsystem_timings['communication_drives'] = 0.0
+        
         # 7. AUTONOMOUS INITIATION: Check for autonomous speech triggers
         try:
             step_start = time.time()
@@ -327,6 +336,45 @@ class CycleExecutor:
             # Add high-priority autonomous goal
             self.state.workspace.add_goal(autonomous_goal)
             logger.info(f"🗣️ Autonomous speech goal added: {autonomous_goal.description}")
+    
+    async def _compute_communication_drives(self) -> None:
+        """
+        Compute internal communication drives from current state.
+        
+        This evaluates workspace state, emotional state, goals, and memories
+        to generate internal urges to communicate. The drives are tracked
+        by the communication drive system for future communication decisions.
+        """
+        if not hasattr(self.subsystems, 'communication_drives'):
+            return
+        
+        snapshot = self.state.workspace.broadcast()
+        
+        # Get emotional state
+        emotional_state = self.subsystems.affect.get_state()
+        
+        # Get active goals
+        goals = list(self.state.workspace.goals.values())
+        
+        # Get recent memories from workspace
+        memories = getattr(self.state.workspace, 'memories', [])
+        
+        # Compute all drives
+        urges = self.subsystems.communication_drives.compute_drives(
+            workspace_state=snapshot,
+            emotional_state=emotional_state,
+            goals=goals,
+            memories=memories
+        )
+        
+        # Log drive state for debugging
+        if urges:
+            summary = self.subsystems.communication_drives.get_drive_summary()
+            logger.debug(
+                f"💬 Communication drives: total={summary['total_drive']:.2f}, "
+                f"urges={summary['active_urges']}, "
+                f"strongest={summary['strongest_urge'].drive_type.value if summary['strongest_urge'] else None}"
+            )
     
     def _update_workspace(self, attended: list, affect_update: dict, meta_percepts: list) -> None:
         """
