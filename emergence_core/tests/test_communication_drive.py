@@ -235,3 +235,100 @@ class TestDriveIntegration:
         # Should have generated some urges
         assert len(system.active_urges) > 0
         assert system.get_total_drive() > 0
+
+
+class TestEdgeCases:
+    """Tests for edge cases and robustness."""
+    
+    def test_empty_inputs(self):
+        """Test with empty inputs."""
+        system = CommunicationDriveSystem()
+        workspace_state = MagicMock()
+        workspace_state.percepts = {}
+        
+        urges = system.compute_drives(
+            workspace_state=workspace_state,
+            emotional_state={},
+            goals=[],
+            memories=[]
+        )
+        
+        # Should handle gracefully without errors
+        assert isinstance(urges, list)
+    
+    def test_none_workspace_state(self):
+        """Test with workspace state missing percepts."""
+        system = CommunicationDriveSystem()
+        workspace_state = MagicMock()
+        del workspace_state.percepts  # No percepts attribute
+        
+        urges = system.compute_drives(
+            workspace_state=workspace_state,
+            emotional_state={"valence": 0.5, "arousal": 0.3},
+            goals=[],
+            memories=[]
+        )
+        
+        # Should not crash
+        assert isinstance(urges, list)
+    
+    def test_invalid_config_values(self):
+        """Test that invalid config values are clamped."""
+        system = CommunicationDriveSystem(config={
+            "insight_threshold": 1.5,  # Should clamp to 1.0
+            "emotional_threshold": -0.2,  # Should clamp to 0.0
+            "social_silence_minutes": -5,  # Should clamp to 1
+            "max_urges": 0  # Should clamp to 1
+        })
+        
+        assert system.insight_threshold == 1.0
+        assert system.emotional_threshold == 0.0
+        assert system.social_silence_minutes == 1
+        assert system.max_urges == 1
+    
+    def test_many_urges_limited(self):
+        """Test that excess urges are limited to max_urges."""
+        system = CommunicationDriveSystem(config={"max_urges": 3})
+        
+        # Add many urges
+        for i in range(10):
+            system.active_urges.append(
+                CommunicationUrge(DriveType.INSIGHT, 0.5 + i * 0.05, priority=0.5)
+            )
+        
+        system._limit_active_urges()
+        
+        # Should keep only strongest 3
+        assert len(system.active_urges) == 3
+        # Should be sorted by weighted intensity
+        assert all(
+            system.active_urges[i].intensity >= system.active_urges[i+1].intensity
+            for i in range(len(system.active_urges) - 1)
+        )
+    
+    def test_zero_intensity_urge(self):
+        """Test handling of zero-intensity urge."""
+        urge = CommunicationUrge(DriveType.SOCIAL, 0.0)
+        assert urge.get_current_intensity() == 0.0
+        assert urge.is_expired()
+    
+    def test_negative_decay_produces_zero(self):
+        """Test that negative decay results produce zero intensity."""
+        urge = CommunicationUrge(DriveType.INSIGHT, 0.5, decay_rate=1.0)
+        urge.created_at = datetime.now() - timedelta(minutes=10)
+        
+        # Should produce negative but clamp to 0.0
+        assert urge.get_current_intensity() == 0.0
+    
+    def test_missing_goal_attributes(self):
+        """Test goals with missing attributes."""
+        system = CommunicationDriveSystem()
+        
+        # Goal with minimal attributes
+        mock_goal = MagicMock()
+        mock_goal.type = None
+        mock_goal.description = None
+        
+        # Should not crash
+        urges = system._compute_goal_drive([mock_goal])
+        assert isinstance(urges, list)

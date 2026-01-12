@@ -341,39 +341,33 @@ class CycleExecutor:
         """
         Compute internal communication drives from current state.
         
-        This evaluates workspace state, emotional state, goals, and memories
-        to generate internal urges to communicate. The drives are tracked
-        by the communication drive system for future communication decisions.
+        Evaluates workspace, emotions, goals, and memories to generate
+        urges to communicate. Runs efficiently with minimal overhead.
         """
         if not hasattr(self.subsystems, 'communication_drives'):
             return
         
+        # Get required state once (avoid multiple calls)
         snapshot = self.state.workspace.broadcast()
-        
-        # Get emotional state
         emotional_state = self.subsystems.affect.get_state()
-        
-        # Get active goals
         goals = list(self.state.workspace.goals.values())
-        
-        # Get recent memories from workspace
         memories = getattr(self.state.workspace, 'memories', [])
         
-        # Compute all drives
-        urges = self.subsystems.communication_drives.compute_drives(
+        # Compute drives
+        new_urges = self.subsystems.communication_drives.compute_drives(
             workspace_state=snapshot,
             emotional_state=emotional_state,
             goals=goals,
             memories=memories
         )
         
-        # Log drive state for debugging
-        if urges:
+        # Log only if new urges generated (reduce log spam)
+        if new_urges:
             summary = self.subsystems.communication_drives.get_drive_summary()
             logger.debug(
-                f"💬 Communication drives: total={summary['total_drive']:.2f}, "
-                f"urges={summary['active_urges']}, "
-                f"strongest={summary['strongest_urge'].drive_type.value if summary['strongest_urge'] else None}"
+                f"💬 Drives: total={summary['total_drive']:.2f}, "
+                f"active={summary['active_urges']}, "
+                f"strongest={summary['strongest_urge'].drive_type.value if summary['strongest_urge'] else 'none'}"
             )
     
     def _update_workspace(self, attended: list, affect_update: dict, meta_percepts: list) -> None:
