@@ -19,6 +19,10 @@ from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
+# Constants for keyword extraction
+PUNCTUATION = '.,!?;:()[]{}"\'"'
+MIN_KEYWORD_LENGTH = 3
+
 
 class InhibitionType(Enum):
     """Types of communication inhibitions."""
@@ -267,9 +271,9 @@ class CommunicationInhibitionSystem:
             content = str(getattr(percept, 'raw', ''))
             if content:
                 # Simple tokenization: lowercase, split on whitespace, filter short words
-                words = [w.strip('.,!?;:()[]{}"\'"').lower() 
+                words = [w.strip(PUNCTUATION).lower() 
                         for w in content.split()
-                        if len(w.strip('.,!?;:()[]{}"\'"')) > 3]
+                        if len(w.strip(PUNCTUATION)) > MIN_KEYWORD_LENGTH]
                 keywords.update(words)
         return keywords
     
@@ -482,9 +486,9 @@ class CommunicationInhibitionSystem:
         # Extract keywords from content if provided
         keywords = set()
         if content:
-            words = [w.strip('.,!?;:()[]{}"\'"').lower() 
+            words = [w.strip(PUNCTUATION).lower() 
                     for w in content.split()
-                    if len(w.strip('.,!?;:()[]{}"\'"')) > 3]
+                    if len(w.strip(PUNCTUATION)) > MIN_KEYWORD_LENGTH]
             keywords = set(words)
         
         # Add to recent outputs
