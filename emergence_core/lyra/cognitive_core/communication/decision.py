@@ -14,6 +14,7 @@ from enum import Enum
 from typing import List, Dict, Any, Optional
 
 from .drive import CommunicationUrge
+from .silence import SilenceTracker, SilenceType
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,9 @@ class DecisionResult:
     urge: Optional[CommunicationUrge] = None
     defer_until: Optional[datetime] = None
     timestamp: datetime = field(default_factory=datetime.now)
+    inhibitions: List[Any] = field(default_factory=list)  # InhibitionFactor instances
+    urges: List[Any] = field(default_factory=list)  # CommunicationUrge instances
+
 
 
 class CommunicationDecisionLoop:
@@ -98,6 +102,9 @@ class CommunicationDecisionLoop:
         self.deferred_queue: List[DeferredCommunication] = []
         self.decision_history: List[DecisionResult] = []
         
+        # Silence tracking
+        self.silence_tracker = SilenceTracker(config)
+        
         logger.info(f"DecisionLoop initialized: speak={self.speak_threshold:.2f}, "
                    f"silence={self.silence_threshold:.2f}")
     
@@ -129,8 +136,13 @@ class CommunicationDecisionLoop:
         net_pressure = drive - inhibition
         strongest_urge = self.drives.get_strongest_urge()
         
+        # Pass active urges and inhibitions for silence tracking (no copy needed)
+        active_urges = self.drives.active_urges
+        active_inhibitions = self.inhibitions.active_inhibitions
+        
         # Make decision
-        result = self._make_decision(drive, inhibition, net_pressure, strongest_urge)
+        result = self._make_decision(drive, inhibition, net_pressure, strongest_urge, 
+                                     active_urges, active_inhibitions)
         self._log_decision(result)
         
         return result
@@ -140,7 +152,9 @@ class CommunicationDecisionLoop:
         drive: float,
         inhibition: float,
         net_pressure: float,
-        strongest_urge: Optional[CommunicationUrge]
+        strongest_urge: Optional[CommunicationUrge],
+        active_urges: List[Any],
+        active_inhibitions: List[Any]
     ) -> DecisionResult:
         """Make decision based on thresholds."""
         # SPEAK: Strong net drive
@@ -152,7 +166,9 @@ class CommunicationDecisionLoop:
                 drive_level=drive,
                 inhibition_level=inhibition,
                 net_pressure=net_pressure,
-                urge=strongest_urge
+                urge=strongest_urge,
+                urges=active_urges,
+                inhibitions=active_inhibitions
             )
         
         # SILENCE: Inhibition dominates
@@ -163,7 +179,9 @@ class CommunicationDecisionLoop:
                 confidence=min(1.0, abs(net_pressure) / abs(self.silence_threshold * 2)),
                 drive_level=drive,
                 inhibition_level=inhibition,
-                net_pressure=net_pressure
+                net_pressure=net_pressure,
+                urges=active_urges,
+                inhibitions=active_inhibitions
             )
         
         # DEFER: Both drive and inhibition significant
@@ -179,7 +197,9 @@ class CommunicationDecisionLoop:
                 inhibition_level=inhibition,
                 net_pressure=net_pressure,
                 urge=strongest_urge,
-                defer_until=defer_until
+                defer_until=defer_until,
+                urges=active_urges,
+                inhibitions=active_inhibitions
             )
         
         # Default: SILENCE (insufficient drive)
@@ -189,7 +209,9 @@ class CommunicationDecisionLoop:
             confidence=_SILENCE_DEFAULT_CONFIDENCE,
             drive_level=drive,
             inhibition_level=inhibition,
-            net_pressure=net_pressure
+            net_pressure=net_pressure,
+            urges=active_urges,
+            inhibitions=active_inhibitions
         )
     
     def _create_deferred_speak_decision(self, deferred: DeferredCommunication) -> DecisionResult:
@@ -247,23 +269,28 @@ class CommunicationDecisionLoop:
         logger.debug(f"Deferred until {deferred.defer_until.strftime('%H:%M:%S')}: {reason}")
     
     def _log_decision(self, result: DecisionResult) -> None:
-        """Log decision to history."""
+        """Log decision to history and update silence tracking."""
         self.decision_history.append(result)
         
         # Maintain size limit
         if len(self.decision_history) > self.history_size:
             self.decision_history = self.decision_history[-self.history_size:]
         
-        # Log at appropriate level
+        # Update silence tracking based on decision
         if result.decision == CommunicationDecision.SPEAK:
-            logger.info(f"✅ SPEAK: {result.reason}")
+            ended_silence = self.silence_tracker.end_silence()
+            if ended_silence:
+                logger.info(f"✅ SPEAK: {result.reason} (breaking silence after {ended_silence.duration:.1f}s)")
+            else:
+                logger.info(f"✅ SPEAK: {result.reason}")
+        elif result.decision == CommunicationDecision.SILENCE:
+            silence_action = self.silence_tracker.record_silence(result)
+            logger.info(f"🔇 SILENCE: {silence_action.silence_type.value} - {silence_action.reason}")
         elif result.decision == CommunicationDecision.DEFER:
             logger.debug(f"⏸️ DEFER: {result.reason}")
-        else:
-            logger.debug(f"🔇 SILENCE: {result.reason}")
     
     def get_decision_summary(self) -> Dict[str, Any]:
-        """Get summary of decision loop state."""
+        """Get summary of decision loop state including silence tracking."""
         recent = self.decision_history[-10:] if self.decision_history else []
         ready_count = sum(1 for d in self.deferred_queue if d.is_ready())
         
@@ -275,5 +302,6 @@ class CommunicationDecisionLoop:
                 decision: sum(1 for d in recent if d.decision == decision)
                 for decision in CommunicationDecision
             },
-            "ready_deferred": ready_count
+            "ready_deferred": ready_count,
+            "silence_tracking": self.silence_tracker.get_silence_summary()
         }
