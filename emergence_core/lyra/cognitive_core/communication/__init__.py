@@ -26,6 +26,12 @@ from .decision import (
     DeferredCommunication
 )
 
+from .silence import (
+    SilenceTracker,
+    SilenceAction,
+    SilenceType
+)
+
 __all__ = [
     'CommunicationDriveSystem',
     'CommunicationUrge',
@@ -36,5 +42,8 @@ __all__ = [
     'CommunicationDecisionLoop',
     'CommunicationDecision',
     'DecisionResult',
-    'DeferredCommunication'
+    'DeferredCommunication',
+    'SilenceTracker',
+    'SilenceAction',
+    'SilenceType'
 ]
