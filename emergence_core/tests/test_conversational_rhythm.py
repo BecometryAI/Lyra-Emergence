@@ -425,3 +425,69 @@ class TestRhythmIntegration:
         timing_inhibitions = inhibition_system._compute_timing_inhibition()
         
         assert len(timing_inhibitions) == 0  # No inhibition without rhythm model
+
+
+class TestInputValidation:
+    """Tests for input validation and error handling."""
+    
+    def test_record_human_input_invalid_type(self):
+        """Test that non-string input raises TypeError."""
+        model = ConversationalRhythmModel()
+        
+        with pytest.raises(TypeError, match="content must be str"):
+            model.record_human_input(123)
+        
+        with pytest.raises(TypeError, match="content must be str"):
+            model.record_human_input(None)
+        
+        with pytest.raises(TypeError, match="content must be str"):
+            model.record_human_input(['hello'])
+    
+    def test_record_system_output_invalid_type(self):
+        """Test that non-string output raises TypeError."""
+        model = ConversationalRhythmModel()
+        
+        with pytest.raises(TypeError, match="content must be str"):
+            model.record_system_output(456)
+        
+        with pytest.raises(TypeError, match="content must be str"):
+            model.record_system_output(None)
+    
+    def test_empty_string_input(self):
+        """Test handling of empty string inputs."""
+        model = ConversationalRhythmModel()
+        
+        model.record_human_input("")
+        assert len(model.turns) == 1
+        assert model.turns[0].content_length == 0
+        
+        model.record_system_output("")
+        assert len(model.turns) == 2
+        assert model.turns[1].content_length == 0
+    
+    def test_very_long_input(self):
+        """Test handling of very long inputs."""
+        model = ConversationalRhythmModel()
+        
+        long_text = "x" * 10000
+        model.record_human_input(long_text)
+        
+        assert model.turns[0].content_length == 10000
+        assert model.avg_turn_length > 50.0  # Should update average
+    
+    def test_config_validation(self):
+        """Test that invalid config values are clamped to minimums."""
+        config = {
+            "natural_pause_threshold": 0.1,  # Below minimum
+            "rapid_exchange_threshold": 0.01,  # Below minimum
+            "max_turn_history": 1,  # Below minimum
+            "default_response_time": 0.1,  # Below minimum
+            "default_turn_length": 1.0  # Below minimum
+        }
+        model = ConversationalRhythmModel(config=config)
+        
+        assert model.natural_pause_threshold >= 0.5
+        assert model.rapid_exchange_threshold >= 0.1
+        assert model.max_turn_history >= 10
+        assert model.avg_response_time >= 0.5
+        assert model.avg_turn_length >= 10.0

@@ -111,104 +111,75 @@ class ConversationalRhythmModel:
         )
     
     def record_human_input(self, content: str) -> None:
-        """
-        Record human started/continued speaking.
+        """Record human started/continued speaking."""
+        if not isinstance(content, str):
+            raise TypeError(f"content must be str, got {type(content).__name__}")
         
-        Args:
-            content: The human's input text
-        """
         now = datetime.now()
+        content_len = len(content)
         
-        # Check if this continues an existing turn or starts a new one
         if self.turns and self.turns[-1].speaker == "human" and not self.turns[-1].is_complete:
-            # Continue existing turn
-            self.turns[-1].content_length += len(content)
+            self.turns[-1].content_length += content_len
             logger.debug(f"Continued human turn, new length: {self.turns[-1].content_length}")
         else:
-            # End previous turn if incomplete
             if self.turns and not self.turns[-1].is_complete:
                 self.turns[-1].ended_at = now
             
-            # Start new human turn
-            turn = ConversationTurn(
+            self.turns.append(ConversationTurn(
                 speaker="human",
                 started_at=now,
-                content_length=len(content)
-            )
-            self.turns.append(turn)
-            logger.debug(f"Started new human turn, length: {len(content)}")
+                content_length=content_len
+            ))
+            logger.debug(f"Started new human turn, length: {content_len}")
         
-        # Limit history size
-        if len(self.turns) > self.max_turn_history:
-            self.turns = self.turns[-self.max_turn_history:]
-        
+        self._limit_history()
         self.update_phase()
         self._update_averages()
     
     def record_system_output(self, content: str) -> None:
-        """
-        Record system spoke.
+        """Record system spoke."""
+        if not isinstance(content, str):
+            raise TypeError(f"content must be str, got {type(content).__name__}")
         
-        Args:
-            content: The system's output text
-        """
         now = datetime.now()
         
-        # End previous turn if incomplete
         if self.turns and not self.turns[-1].is_complete:
             self.turns[-1].ended_at = now
         
-        # Start new system turn
-        turn = ConversationTurn(
+        self.turns.append(ConversationTurn(
             speaker="system",
             started_at=now,
-            ended_at=now,  # System turns are instantaneous for timing purposes
+            ended_at=now,
             content_length=len(content)
-        )
-        self.turns.append(turn)
+        ))
         logger.debug(f"Recorded system turn, length: {len(content)}")
         
-        # Limit history size
-        if len(self.turns) > self.max_turn_history:
-            self.turns = self.turns[-self.max_turn_history:]
-        
+        self._limit_history()
         self.update_phase()
         self._update_averages()
     
     def _get_silence_duration(self) -> float:
-        """
-        Get silence duration since last completed turn.
-        
-        Returns:
-            Seconds since last turn ended, or 0.0 if current turn is incomplete
-        """
-        if not self.turns:
+        """Get silence duration since last completed turn."""
+        if not self.turns or not self.turns[-1].is_complete:
             return 0.0
-        
-        last_turn = self.turns[-1]
-        if not last_turn.is_complete:
-            return 0.0
-        
-        return (datetime.now() - last_turn.ended_at).total_seconds()
+        return (datetime.now() - self.turns[-1].ended_at).total_seconds()
     
     def _get_time_since_last_event(self) -> float:
         """
-        Get time since last turn event (start or end depending on completion).
+        Get time since last turn event.
         
-        For incomplete turns, returns time since turn started (turn duration).
-        For complete turns, returns time since turn ended (silence duration).
-        
-        Returns:
-            Seconds since last relevant event, or 0.0 if no turns
+        For incomplete turns: time since turn started (turn duration)
+        For complete turns: time since turn ended (silence duration)
         """
         if not self.turns:
             return 0.0
-        
-        last_turn = self.turns[-1]
-        if last_turn.is_complete:
-            return self._get_silence_duration()
-        else:
-            return (datetime.now() - last_turn.started_at).total_seconds()
+        return self._get_silence_duration() if self.turns[-1].is_complete else \
+               (datetime.now() - self.turns[-1].started_at).total_seconds()
+    
+    def _limit_history(self) -> None:
+        """Limit turn history to configured maximum."""
+        if len(self.turns) > self.max_turn_history:
+            self.turns = self.turns[-self.max_turn_history:]
     
     def update_phase(self) -> None:
         """Update current conversation phase based on timing and turn state."""
@@ -221,180 +192,111 @@ class ConversationalRhythmModel:
         
         last_turn = self.turns[-1]
         
-        # Check for rapid exchange (multiple turns in quick succession)
-        if len(self.turns) >= 3:
-            recent_turns = self.turns[-3:]
-            if all(turn.is_complete for turn in recent_turns):
-                gaps = []
-                for i in range(len(recent_turns) - 1):
-                    gap = (recent_turns[i + 1].started_at - recent_turns[i].ended_at).total_seconds()
-                    gaps.append(gap)
-                
-                avg_gap = sum(gaps) / len(gaps)
-                if avg_gap < self.rapid_exchange_threshold:
-                    self.current_phase = ConversationPhase.RAPID_EXCHANGE
-                    self._last_phase_update = now
-                    return
+        # Check for rapid exchange
+        if self._is_rapid_exchange():
+            self.current_phase = ConversationPhase.RAPID_EXCHANGE
+            self._last_phase_update = now
+            return
         
-        # Determine phase based on last turn and timing
+        # Determine phase based on last turn
         if not last_turn.is_complete:
-            if last_turn.speaker == "human":
-                self.current_phase = ConversationPhase.HUMAN_SPEAKING
-            else:
-                self.current_phase = ConversationPhase.SYSTEM_SPEAKING
+            self.current_phase = ConversationPhase.HUMAN_SPEAKING if last_turn.speaker == "human" \
+                                 else ConversationPhase.SYSTEM_SPEAKING
         elif last_turn.speaker == "human":
-            # Human spoke last, now silent - measure time since turn ended
-            silence_duration = self._get_silence_duration()
-            if silence_duration < self.natural_pause_threshold:
-                self.current_phase = ConversationPhase.HUMAN_PAUSED
-            else:
-                self.current_phase = ConversationPhase.MUTUAL_SILENCE
+            silence = self._get_silence_duration()
+            self.current_phase = ConversationPhase.HUMAN_PAUSED if silence < self.natural_pause_threshold \
+                                 else ConversationPhase.MUTUAL_SILENCE
         else:
-            # System spoke last
             self.current_phase = ConversationPhase.MUTUAL_SILENCE
         
         self._last_phase_update = now
+    
+    def _is_rapid_exchange(self) -> bool:
+        """Check if conversation is in rapid exchange mode."""
+        if len(self.turns) < 3:
+            return False
+        
+        recent_turns = self.turns[-3:]
+        if not all(turn.is_complete for turn in recent_turns):
+            return False
+        
+        gaps = [(recent_turns[i + 1].started_at - recent_turns[i].ended_at).total_seconds()
+                for i in range(len(recent_turns) - 1)]
+        return sum(gaps) / len(gaps) < self.rapid_exchange_threshold
     
     def get_timing_appropriateness(self) -> float:
         """
         Get how appropriate it is to speak now (0.0-1.0).
         
-        Returns:
-            Appropriateness score:
-            - 1.0 = highly appropriate (natural pause, waiting for response)
-            - 0.5 = neutral (mutual silence)
-            - 0.0 = inappropriate (interrupting human)
+        Returns 1.0 for highly appropriate, 0.0 for inappropriate timing.
         """
         self.update_phase()
         
         if not self.turns:
-            return 0.8  # No conversation yet, slightly appropriate
+            return 0.8
         
         time_since_last = self._get_time_since_last_event()
         
-        # Phase-based appropriateness
-        if self.current_phase == ConversationPhase.HUMAN_SPEAKING:
-            # Human is actively speaking - very inappropriate to interrupt
-            return 0.0
+        # Return appropriateness based on phase
+        phase_handlers = {
+            ConversationPhase.HUMAN_SPEAKING: lambda: 0.0,
+            ConversationPhase.HUMAN_PAUSED: lambda: self._calc_pause_appropriateness(time_since_last),
+            ConversationPhase.SYSTEM_SPEAKING: lambda: 0.1,
+            ConversationPhase.MUTUAL_SILENCE: lambda: self._calc_silence_appropriateness(time_since_last),
+            ConversationPhase.RAPID_EXCHANGE: lambda: 0.9 if self.turns[-1].speaker == "human" else 0.3
+        }
         
-        elif self.current_phase == ConversationPhase.HUMAN_PAUSED:
-            # Human paused - appropriateness increases with pause duration
-            # Full appropriateness at PAUSE_NORMALIZATION_FACTOR x the pause threshold
-            pause_threshold_full = self.natural_pause_threshold * PAUSE_NORMALIZATION_FACTOR
-            normalized_pause = min(1.0, time_since_last / pause_threshold_full)
-            return 0.3 + (0.7 * normalized_pause)
-        
-        elif self.current_phase == ConversationPhase.SYSTEM_SPEAKING:
-            # System already speaking - shouldn't interrupt self
-            return 0.1
-        
-        elif self.current_phase == ConversationPhase.MUTUAL_SILENCE:
-            # Mutual silence - appropriateness peaks around avg response time
-            # Then gradually increases again for extended silence
-            if time_since_last < self.avg_response_time:
-                # Before expected response time - moderately appropriate
-                return 0.5 + (0.3 * (time_since_last / self.avg_response_time))
-            else:
-                # After expected response time - increasingly appropriate
-                excess = time_since_last - self.avg_response_time
-                return min(1.0, 0.8 + (0.2 * (excess / self.avg_response_time)))
-        
-        elif self.current_phase == ConversationPhase.RAPID_EXCHANGE:
-            # Rapid exchange - appropriate if it's our turn
-            if self.turns and self.turns[-1].speaker == "human":
-                return 0.9
-            else:
-                return 0.3
-        
-        return 0.5  # Default neutral
+        return phase_handlers.get(self.current_phase, lambda: 0.5)()
+    
+    def _calc_pause_appropriateness(self, time_since_last: float) -> float:
+        """Calculate appropriateness during human pause."""
+        pause_threshold_full = self.natural_pause_threshold * PAUSE_NORMALIZATION_FACTOR
+        normalized_pause = min(1.0, time_since_last / pause_threshold_full)
+        return 0.3 + (0.7 * normalized_pause)
+    
+    def _calc_silence_appropriateness(self, time_since_last: float) -> float:
+        """Calculate appropriateness during mutual silence."""
+        if time_since_last < self.avg_response_time:
+            return 0.5 + (0.3 * (time_since_last / self.avg_response_time))
+        excess = time_since_last - self.avg_response_time
+        return min(1.0, 0.8 + (0.2 * (excess / self.avg_response_time)))
     
     def get_suggested_wait_time(self) -> float:
-        """
-        Get suggested seconds to wait before speaking.
-        
-        Returns:
-            Suggested wait time in seconds (0.0 = can speak now)
-        """
+        """Get suggested seconds to wait before speaking."""
         appropriateness = self.get_timing_appropriateness()
         
-        if appropriateness >= 0.8:
-            return 0.0  # Highly appropriate, no wait needed
-        
-        if not self.turns:
-            return 0.5  # Brief wait to be polite
+        if appropriateness >= 0.8 or not self.turns:
+            return 0.0 if appropriateness >= 0.8 else 0.5
         
         time_since_last = self._get_time_since_last_event()
         
         # Calculate wait time based on phase
-        if self.current_phase == ConversationPhase.HUMAN_SPEAKING:
-            # Wait for natural pause
-            return self.natural_pause_threshold
+        wait_handlers = {
+            ConversationPhase.HUMAN_SPEAKING: lambda: self.natural_pause_threshold,
+            ConversationPhase.HUMAN_PAUSED: lambda: max(0.0, self.natural_pause_threshold - time_since_last),
+            ConversationPhase.SYSTEM_SPEAKING: lambda: 0.5,
+            ConversationPhase.MUTUAL_SILENCE: lambda: (self.avg_response_time - time_since_last) * 0.5 
+                                                      if time_since_last < self.avg_response_time else 0.0,
+            ConversationPhase.RAPID_EXCHANGE: lambda: 0.1 if self.turns[-1].speaker == "human" else 1.0
+        }
         
-        elif self.current_phase == ConversationPhase.HUMAN_PAUSED:
-            # Wait a bit more for pause to become more natural
-            remaining = self.natural_pause_threshold - time_since_last
-            return max(0.0, remaining)
-        
-        elif self.current_phase == ConversationPhase.SYSTEM_SPEAKING:
-            # Brief wait for system to finish
-            return 0.5
-        
-        elif self.current_phase == ConversationPhase.MUTUAL_SILENCE:
-            # If before avg response time, wait closer to it
-            if time_since_last < self.avg_response_time:
-                return (self.avg_response_time - time_since_last) * 0.5
-            return 0.0
-        
-        elif self.current_phase == ConversationPhase.RAPID_EXCHANGE:
-            # Rapid exchange - minimal wait if it's our turn
-            if self.turns and self.turns[-1].speaker == "human":
-                return 0.1
-            return 1.0
-        
-        return 0.0
+        return wait_handlers.get(self.current_phase, lambda: 0.0)()
     
     def is_natural_pause(self) -> bool:
-        """
-        Detect if we're at a natural conversation pause.
-        
-        Returns:
-            True if this is a natural pause point
-        """
+        """Detect if we're at a natural conversation pause."""
         if not self.turns:
-            return True  # No conversation yet
+            return True
         
         self.update_phase()
         
-        # Natural pause conditions
         if self.current_phase in [ConversationPhase.HUMAN_PAUSED, ConversationPhase.MUTUAL_SILENCE]:
-            silence_duration = self._get_silence_duration()
-            return silence_duration >= self.natural_pause_threshold
+            return self._get_silence_duration() >= self.natural_pause_threshold
         
-        # Rapid exchange with human just spoke
-        if self.current_phase == ConversationPhase.RAPID_EXCHANGE:
-            if self.turns and self.turns[-1].speaker == "human":
-                return True
-        
-        return False
+        return self.current_phase == ConversationPhase.RAPID_EXCHANGE and \
+               self.turns[-1].speaker == "human"
     
     def get_rhythm_summary(self) -> Dict[str, Any]:
-        """
-        Get summary of conversation rhythm metrics.
-        
-        Returns:
-            Dictionary containing rhythm metrics and state
-        """
-        now = datetime.now()
-        
-        # Calculate silence duration using helper method
-        silence_duration = self._get_silence_duration()
-        
-        # Get last speaker
-        last_speaker = None
-        if self.turns:
-            last_speaker = self.turns[-1].speaker
-        
-        # Calculate conversation tempo (fast, normal, slow)
+        """Get summary of conversation rhythm metrics."""
         tempo = "normal"
         if self.avg_response_time < 1.5:
             tempo = "fast"
@@ -407,8 +309,8 @@ class ConversationalRhythmModel:
             "avg_response_time": round(self.avg_response_time, 2),
             "avg_turn_length": round(self.avg_turn_length, 1),
             "conversation_tempo": tempo,
-            "last_speaker": last_speaker,
-            "silence_duration": round(silence_duration, 2),
+            "last_speaker": self.turns[-1].speaker if self.turns else None,
+            "silence_duration": round(self._get_silence_duration(), 2),
             "is_natural_pause": self.is_natural_pause(),
             "timing_appropriateness": round(self.get_timing_appropriateness(), 2),
             "suggested_wait_time": round(self.get_suggested_wait_time(), 2),
