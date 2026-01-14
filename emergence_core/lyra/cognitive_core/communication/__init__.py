@@ -38,6 +38,12 @@ from .silence import (
     SilenceType
 )
 
+from .rhythm import (
+    ConversationalRhythmModel,
+    ConversationPhase,
+    ConversationTurn
+)
+
 __all__ = [
     'CommunicationDriveSystem',
     'CommunicationUrge',
@@ -53,5 +59,8 @@ __all__ = [
     'DecisionResult',
     'SilenceTracker',
     'SilenceAction',
-    'SilenceType'
+    'SilenceType',
+    'ConversationalRhythmModel',
+    'ConversationPhase',
+    'ConversationTurn'
 ]
