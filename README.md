@@ -967,7 +967,7 @@ Lyra uses an **LMT (Lyra Memory Token)** wallet for cognitive resource managemen
 
 **Quick Reference:**
 - Default daily income: **500 LMT/day**
-- Adjust daily income: See [LMT Wallet Guide](docs/LMT_WALLET_GUIDE.md)
+- Configuration can be adjusted programmatically
 
 ```python
 from emergence_core.lyra.economy.wallet import LMTWallet

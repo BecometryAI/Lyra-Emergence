@@ -86,7 +86,7 @@ def main():
     print("  Major development:   1500 LMT/day")
     print()
     print("To adjust: wallet.set_daily_ubi_amount(amount, reason)")
-    print("See docs/LMT_WALLET_GUIDE.md for complete API reference")
+    print("See operational_guidelines_and_instructions.md for complete operational reference")
     print("=" * 80)
 
 

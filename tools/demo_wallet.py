@@ -93,7 +93,7 @@ def main():
     
     print("\n8. QUICK REFERENCE FILES")
     print("-" * 60)
-    print("   Full documentation: docs/LMT_WALLET_GUIDE.md")
+    print("   Operational documentation: operational_guidelines_and_instructions.md")
     print("   Security details: See wallet docstring in code")
     print("   Ledger file: data/economy/ledger.json")
     
