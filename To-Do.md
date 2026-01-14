@@ -388,7 +388,7 @@ Priority tasks for next milestone:
 
 ### For Contributors
 
-1. **Review Architecture**: See [ARCHITECTURE.md](ARCHITECTURE.md) and [FUNCTIONAL_SPECIFICATIONS.md](FUNCTIONAL_SPECIFICATIONS.md)
+1. **Review Architecture**: See README.md for architecture overview and operational_guidelines_and_instructions.md for operational guidance
 2. **Check Dependencies**: Some tasks depend on others (e.g., communication agency needs decoupled I/O)
 3. **Claim a Task**: Comment on this issue or open a new issue referencing the task
 4. **Create Branch**: `git checkout -b feature/<task-name>`
