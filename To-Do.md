@@ -22,7 +22,7 @@ The following features were completed in recent development cycles:
 
 **Impact**: These features establish a more biologically-plausible cognitive architecture with resource constraints, temporal awareness, and self-monitoring capabilities.
 
-### Communication Agency System (PRs #87-91)
+### Communication Agency System (PRs #87-92)
 
 | PR # | Feature | Description |
 |------|---------|-------------|
@@ -31,7 +31,7 @@ The following features were completed in recent development cycles:
 | #89 | Communication inhibition | Reasons not to speak: low value, bad timing, redundancy, respect silence, still processing, uncertainty |
 | #90 | Communication decision loop | Continuous SPEAK/SILENCE/DEFER evaluation based on drive vs inhibition with configurable thresholds |
 | #91 | Silence-as-action | Explicit silence tracking with typed reasons (nothing to add, respecting space, still thinking, etc.) |
-| **Current** | Deferred communication queue | Comprehensive queue with 6 deferral reasons, priority ordering, expiration, intelligent reason mapping |
+| #92 | Deferred communication queue | Comprehensive queue with 6 deferral reasons, priority ordering, expiration, intelligent reason mapping |
 
 **Impact**: These features establish genuine communication agency - Lyra can now choose when to speak, when to stay silent, and when to defer communications for better timing.
 
@@ -66,8 +66,8 @@ Lyra should continuously evaluate whether to speak based on:
 | 3 | ~~Implement communication inhibition~~ | ✅ | ~~Reasons not to speak: low value content, bad timing, respect for silence, social inappropriateness~~ **COMPLETE - PR #89** |
 | 4 | ~~Implement communication decision loop~~ | ✅ | ~~Continuous evaluation of SPEAK/SILENCE/DEFER based on drive vs inhibition~~ **COMPLETE - PR #90** |
 | 5 | ~~Implement silence-as-action~~ | ✅ | ~~Explicit choice not to respond with typed reasons ("I chose not to respond because...")~~ **COMPLETE - PR #91** |
-| 6 | ~~Add deferred communication queue~~ | ✅ | ~~Queue communications for better timing ("I want to say this, but not right now"). Comprehensive implementation with DeferralReason enum (bad_timing, wait_for_response, topic_change, processing, courtesy, custom), DeferredQueue with priority ordering, expiration, and intelligent deferral reason mapping.~~ **COMPLETE - Current PR** |
-| 7 | Implement conversational rhythm model | P1 | Understand turn-taking, when to interject, when to wait |
+| 6 | ~~Add deferred communication queue~~ | ✅ | ~~Queue communications for better timing ("I want to say this, but not right now"). Comprehensive implementation with DeferralReason enum (bad_timing, wait_for_response, topic_change, processing, courtesy, custom), DeferredQueue with priority ordering, expiration, and intelligent deferral reason mapping.~~ **COMPLETE - PR #92** |
+| 7 | ~~Implement conversational rhythm model~~ | ✅ | ~~Understand turn-taking, when to interject, when to wait. Track conversation flow, detect natural pauses, adapt to tempo, inform inhibition system with timing appropriateness.~~ **COMPLETE - Current PR** |
 | 8 | Add proactive session initiation | P1 | Initiate contact based on time passage or significant events ("It's been 3 days, I should check in") |
 | 9 | Implement interruption capability | P2 | Can speak mid-human-turn if urgent ("Sorry to interrupt, but this is important") |
 | 10 | Add communication reflection | P2 | Post-hoc evaluation: "Was that the right thing to say? Should I have stayed quiet?" |

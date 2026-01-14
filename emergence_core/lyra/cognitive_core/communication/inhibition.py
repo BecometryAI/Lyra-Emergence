@@ -80,11 +80,18 @@ class CommunicationInhibitionSystem:
     Provides counterbalancing force to the Communication Drive System.
     """
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """Initialize with optional configuration."""
+    def __init__(self, config: Optional[Dict[str, Any]] = None, rhythm_model: Optional[Any] = None):
+        """
+        Initialize with optional configuration and rhythm model.
+        
+        Args:
+            config: Optional configuration dict
+            rhythm_model: Optional ConversationalRhythmModel for timing inhibition
+        """
         self.active_inhibitions: List[InhibitionFactor] = []
         self.recent_outputs: List[Dict[str, Any]] = []
         self.last_output_time: Optional[datetime] = None
+        self.rhythm_model = rhythm_model
         self._load_config(config or {})
     
     def _load_config(self, config: Dict[str, Any]) -> None:
@@ -119,7 +126,7 @@ class CommunicationInhibitionSystem:
         """
         emotional_state = emotional_state or {}
         
-        # Compute all 7 inhibition types
+        # Compute all inhibition types (now 8 with timing)
         new_inhibitions = [
             *self._compute_low_value_inhibition(content_value),
             *self._compute_bad_timing_inhibition(),
@@ -127,7 +134,8 @@ class CommunicationInhibitionSystem:
             *self._compute_respect_silence_inhibition(emotional_state, urges),
             *self._compute_still_processing_inhibition(workspace_state),
             *self._compute_uncertainty_inhibition(confidence),
-            *self._compute_recent_output_inhibition()
+            *self._compute_recent_output_inhibition(),
+            *self._compute_timing_inhibition()
         ]
         
         # Maintain active inhibitions list
@@ -312,6 +320,33 @@ class CommunicationInhibitionSystem:
             reason=f"Output frequency ({outputs_per_minute:.1f}/min) too high",
             priority=0.6,
             duration=timedelta(minutes=1)
+        )]
+    
+    def _compute_timing_inhibition(self) -> List[InhibitionFactor]:
+        """
+        Compute inhibition from conversational rhythm/timing using rhythm model.
+        
+        Uses the ConversationalRhythmModel to determine if now is an appropriate
+        time to speak based on conversation flow, turn-taking, and pauses.
+        """
+        if self.rhythm_model is None:
+            return []
+        
+        appropriateness = self.rhythm_model.get_timing_appropriateness()
+        
+        # Only create inhibition if timing is poor (< 0.3)
+        if appropriateness >= 0.3:
+            return []
+        
+        # Stronger inhibition for worse timing
+        strength = 1.0 - appropriateness
+        
+        return [InhibitionFactor(
+            inhibition_type=InhibitionType.BAD_TIMING,
+            strength=strength,
+            reason=f"Not a natural pause point (appropriateness: {appropriateness:.2f})",
+            priority=0.85,  # High priority for conversational rhythm
+            duration=timedelta(seconds=self.rhythm_model.get_suggested_wait_time())
         )]
     
     def _cleanup_expired_inhibitions(self) -> None:
