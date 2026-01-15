@@ -1,10 +1,7 @@
 """
 WorldModel: Hierarchical predictive world model (IWMT core).
 
-This module implements the core WorldModel class that integrates:
-- SelfModel: Representation of the agent itself
-- EnvironmentModel: Representation of the external world
-- Prediction tracking and prediction error computation
+Integrates self-model, environment model, and prediction tracking.
 """
 
 from __future__ import annotations
@@ -18,6 +15,10 @@ from .self_model import SelfModel
 from .environment_model import EnvironmentModel
 
 logger = logging.getLogger(__name__)
+
+# Configuration constants
+MAX_PREDICTIONS = 200
+MAX_ERRORS = 100
 
 
 class WorldModel:
@@ -68,12 +69,10 @@ class WorldModel:
         env_predictions = self.environment_model.predict_environment(time_horizon, context)
         predictions.extend(env_predictions)
         
-        # Store predictions
+        # Store predictions and keep bounded
         self.predictions.extend(predictions)
-        
-        # Keep predictions list bounded
-        if len(self.predictions) > 200:
-            self.predictions = self.predictions[-200:]
+        if len(self.predictions) > MAX_PREDICTIONS:
+            self.predictions = self.predictions[-MAX_PREDICTIONS:]
         
         logger.debug(f"Generated {len(predictions)} predictions for horizon {time_horizon}s")
         return predictions
@@ -86,35 +85,23 @@ class WorldModel:
             percept: New perceptual input
             
         Returns:
-            PredictionError if there's a mismatch, None otherwise
+            PredictionError if mismatch detected, None otherwise
         """
-        # Simple heuristic: check if percept contradicts any active predictions
-        # In a full implementation, this would use semantic comparison
-        
         if not self.predictions:
-            # No predictions to compare against
             return None
         
-        # Find most relevant prediction (for now, use most recent)
-        relevant_prediction = self.predictions[-1] if self.predictions else None
-        
-        if relevant_prediction is None:
-            return None
-        
-        # Compute prediction error
-        # For this implementation, we'll use a simple heuristic
-        # In practice, this would involve semantic comparison
+        # Use most recent prediction
+        relevant_prediction = self.predictions[-1]
         
         # Extract percept content
         percept_content = str(percept) if not isinstance(percept, dict) else percept.get("content", str(percept))
         
-        # Compare prediction to percept (simple string-based heuristic)
-        prediction_text = relevant_prediction.content.lower()
-        percept_text = percept_content.lower()
+        # Compare prediction to percept (simple word overlap heuristic)
+        prediction_words = set(relevant_prediction.content.lower().split())
+        percept_words = set(percept_content.lower().split())
         
-        # Simple overlap check
-        overlap = len(set(prediction_text.split()) & set(percept_text.split()))
-        total_words = len(set(prediction_text.split()) | set(percept_text.split()))
+        overlap = len(prediction_words & percept_words)
+        total_words = len(prediction_words | percept_words)
         
         if total_words == 0:
             match_score = 0.0
@@ -135,23 +122,16 @@ class WorldModel:
             )
             
             self.prediction_errors.append(error)
+            if len(self.prediction_errors) > MAX_ERRORS:
+                self.prediction_errors = self.prediction_errors[-MAX_ERRORS:]
             
-            # Keep error list bounded
-            if len(self.prediction_errors) > 100:
-                self.prediction_errors = self.prediction_errors[-100:]
-            
-            logger.debug(f"Prediction error detected: magnitude={magnitude:.2f}, surprise={surprise:.2f}")
+            logger.debug(f"Prediction error: magnitude={magnitude:.2f}, surprise={surprise:.2f}")
             return error
         
         return None
     
     def get_prediction_error_summary(self) -> Dict[str, Any]:
-        """
-        Summary of current prediction errors.
-        
-        Returns:
-            Dictionary with error statistics
-        """
+        """Summary of current prediction errors."""
         if not self.prediction_errors:
             return {
                 "total_errors": 0,
@@ -162,11 +142,12 @@ class WorldModel:
         
         magnitudes = [e.magnitude for e in self.prediction_errors]
         surprises = [e.surprise for e in self.prediction_errors]
+        num_errors = len(self.prediction_errors)
         
         return {
-            "total_errors": len(self.prediction_errors),
-            "average_magnitude": sum(magnitudes) / len(magnitudes),
-            "average_surprise": sum(surprises) / len(surprises),
+            "total_errors": num_errors,
+            "average_magnitude": sum(magnitudes) / num_errors,
+            "average_surprise": sum(surprises) / num_errors,
             "max_surprise": max(surprises),
             "recent_errors": [
                 {

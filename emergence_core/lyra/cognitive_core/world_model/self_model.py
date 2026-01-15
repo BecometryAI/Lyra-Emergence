@@ -1,21 +1,23 @@
 """
 SelfModel: Explicit model of self-in-world (IWMT requirement).
 
-This module implements the embodied self representation, tracking:
-- Capabilities: What the system can do
-- States: Current internal states
-- Self-predictions: Predictions about own behavior
+Tracks capabilities, internal states, and self-predictions.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from datetime import datetime
 
 from .prediction import Prediction
 
 logger = logging.getLogger(__name__)
+
+# Configuration constants
+MAX_ACTION_HISTORY = 100
+MAX_SELF_PREDICTIONS = 100
+LEARNING_RATE = 0.05
 
 
 class SelfModel:
@@ -57,23 +59,13 @@ class SelfModel:
         logger.info("SelfModel initialized")
     
     def predict_own_behavior(self, context: Dict[str, Any]) -> Prediction:
-        """
-        Predict what I will do/say in given context.
-        
-        Args:
-            context: Current context including goals, emotional state, etc.
-            
-        Returns:
-            Prediction about own behavior
-        """
-        # Simple heuristic prediction based on current state
+        """Predict what I will do/say in given context."""
         goals = context.get("goals", [])
         emotional_valence = self.states.get("emotional_valence", 0.0)
         
-        # Predict response type based on goals and emotional state
+        # Determine prediction based on context
         if goals:
-            top_goal = goals[0] if goals else None
-            content = f"Will pursue goal: {top_goal}"
+            content = f"Will pursue goal: {goals[0]}"
             confidence = 0.6
         elif emotional_valence < -0.5:
             content = "Will express negative emotion or concern"
@@ -88,22 +80,19 @@ class SelfModel:
         prediction = Prediction(
             content=content,
             confidence=confidence,
-            time_horizon=1.0,  # 1 second ahead
+            time_horizon=1.0,
             source="self_model",
             created_at=datetime.now()
         )
         
         self.predictions_about_self.append(prediction)
+        if len(self.predictions_about_self) > MAX_SELF_PREDICTIONS:
+            self.predictions_about_self = self.predictions_about_self[-MAX_SELF_PREDICTIONS:]
+        
         return prediction
     
     def update_from_action(self, action: Dict[str, Any], outcome: Dict[str, Any]):
-        """
-        Update self-model based on action outcomes.
-        
-        Args:
-            action: The action that was taken
-            outcome: The result of that action
-        """
+        """Update self-model based on action outcomes."""
         # Record action-outcome pair
         self._action_history.append({
             "action": action,
@@ -111,9 +100,8 @@ class SelfModel:
             "timestamp": datetime.now()
         })
         
-        # Keep history bounded
-        if len(self._action_history) > 100:
-            self._action_history = self._action_history[-100:]
+        if len(self._action_history) > MAX_ACTION_HISTORY:
+            self._action_history = self._action_history[-MAX_ACTION_HISTORY:]
         
         # Update capability estimates based on success/failure
         action_type = action.get("type", "unknown")
@@ -126,15 +114,14 @@ class SelfModel:
             "remember": "memory_retrieval",
         }
         
-        if action_type in capability_map:
-            capability = capability_map[action_type]
-            if capability in self.capabilities:
-                # Update capability estimate (small learning rate)
-                current = self.capabilities[capability]
-                target = 1.0 if success else 0.5
-                self.capabilities[capability] = current * 0.95 + target * 0.05
+        capability = capability_map.get(action_type)
+        if capability and capability in self.capabilities:
+            # Update with exponential moving average
+            current = self.capabilities[capability]
+            target = 1.0 if success else 0.5
+            self.capabilities[capability] = current * (1 - LEARNING_RATE) + target * LEARNING_RATE
         
-        logger.debug(f"Updated self-model from action: {action_type} -> {success}")
+        logger.debug(f"Updated self-model: {action_type} -> {success}")
     
     def update_state(self, state_name: str, value: Any):
         """

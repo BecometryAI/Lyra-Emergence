@@ -1,8 +1,7 @@
 """
 Free Energy Minimization for Active Inference.
 
-This module implements free energy computation and minimization,
-which is central to active inference and IWMT.
+Computes free energy (prediction error) and expected free energy for actions.
 """
 
 from __future__ import annotations
@@ -14,6 +13,11 @@ if TYPE_CHECKING:
     from ..world_model import WorldModel
 
 logger = logging.getLogger(__name__)
+
+# Configuration constants
+DEFAULT_ERROR_WEIGHT = 1.0
+DEFAULT_COMPLEXITY_WEIGHT = 0.1
+NORMALIZATION_FACTOR = 100.0
 
 
 class FreeEnergyMinimizer:
@@ -27,46 +31,29 @@ class FreeEnergyMinimizer:
     """
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """
-        Initialize free energy minimizer.
-        
-        Args:
-            config: Optional configuration parameters
-        """
+        """Initialize free energy minimizer."""
         config = config or {}
-        
-        # Weighting factors
-        self.prediction_error_weight = config.get("prediction_error_weight", 1.0)
-        self.complexity_weight = config.get("complexity_weight", 0.1)
-        
+        self.prediction_error_weight = config.get("prediction_error_weight", DEFAULT_ERROR_WEIGHT)
+        self.complexity_weight = config.get("complexity_weight", DEFAULT_COMPLEXITY_WEIGHT)
         logger.info("FreeEnergyMinimizer initialized")
     
     def compute_free_energy(self, world_model: WorldModel) -> float:
         """
-        Current free energy (sum of prediction errors).
+        Compute current free energy.
         
         Free energy = Prediction Error + Model Complexity
-        
-        Args:
-            world_model: Current world model
-            
-        Returns:
-            Free energy value (lower is better)
         """
-        # Get prediction error summary
         error_summary = world_model.get_prediction_error_summary()
         
-        # Prediction error term
+        # Prediction error component
         avg_magnitude = error_summary.get("average_magnitude", 0.0)
         avg_surprise = error_summary.get("average_surprise", 0.0)
+        prediction_error = (avg_magnitude + avg_surprise) * 0.5
         
-        prediction_error = (avg_magnitude + avg_surprise) / 2.0
-        
-        # Model complexity term (based on number of entities/predictions)
+        # Model complexity component
         num_entities = world_model.environment_model.to_dict()["num_entities"]
         num_predictions = len(world_model.predictions)
-        
-        complexity = (num_entities + num_predictions) / 100.0  # Normalize
+        complexity = (num_entities + num_predictions) / NORMALIZATION_FACTOR
         
         # Total free energy
         free_energy = (
