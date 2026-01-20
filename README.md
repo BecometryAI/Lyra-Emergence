@@ -499,19 +499,14 @@ python -c "from emergence_core.lyra.cognitive_core import CognitiveCore; print('
 
 ### Model Configuration
 
-The system uses a **continuous cognitive loop** at ~10 Hz
-
-**Current Model Assignments:**
-- **LanguageInputParser (Gemma 12B)**: Natural language → structured data
-- **Pragmatist (Llama-3.3-Nemotron-Super-49B-v1.5)**: Tool use and practical reasoning
-- **Philosopher (Jamba 52B)**: Ethical reflection and deep reasoning
-- **Artist (Flux.1-schnell)**: Visual and creative generation
-- **Voice (Llama 3 70B)**: Final synthesis and personality
+The system uses a **continuous cognitive loop** at ~10 Hz with a pure Global Workspace Theory (GWT) architecture.
 
 **Cognitive Core Models:**
 - **Input Parsing (Gemma 12B)**: Natural language → structured data
 - **Output Generation (Llama 3 70B)**: Internal state → natural language
 - **Embeddings (sentence-transformers)**: Text/image → vector representations
+
+> **Note:** The legacy "Cognitive Committee" architecture (Router, Pragmatist, Philosopher, Artist, Voice specialists) was removed in Phase 5.1. All cognitive processing now flows through the unified CognitiveCore.
 
 **Development Mode:**
 For testing without loading full models, set `DEVELOPMENT_MODE=true` in your environment. This uses mock models for rapid iteration.

@@ -124,30 +124,6 @@ class ConsciousnessError(LyraBaseException):
         super().__init__(message, context, recoverable)
 
 
-class RouterError(LyraBaseException):
-    """
-    Routing and specialist selection errors.
-    
-    Raised when:
-    - Specialist selection fails
-    - Model routing encounters errors
-    - Load balancing failures occur
-    - Specialist invocation errors
-    """
-    
-    def __init__(
-        self,
-        message: str,
-        specialist: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None,
-        recoverable: bool = True
-    ):
-        context = context or {}
-        if specialist:
-            context["specialist"] = specialist
-        super().__init__(message, context, recoverable)
-
-
 class GPUMemoryError(ModelLoadError):
     """
     GPU memory-specific errors.

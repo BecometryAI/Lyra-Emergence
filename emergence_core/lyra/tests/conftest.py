@@ -40,28 +40,6 @@ def mock_chroma_collection():
     return mock_collection
 
 @pytest.fixture
-def mock_router_model():
-    """Create a mock router model."""
-    mock_model = Mock()
-    mock_model.process.return_value = {
-        'intent': 'philosopher',
-        'resonance_term': None
-    }
-    return mock_model
-
-@pytest.fixture
-def mock_specialist():
-    """Create a mock specialist."""
-    mock_spec = Mock()
-    mock_spec.process.return_value = Mock(
-        content="Test response",
-        metadata={"role": "test"},
-        thought_process="Test thought",
-        confidence=0.9
-    )
-    return mock_spec
-
-@pytest.fixture
 async def test_cache(test_data_dir):
     """Create a test RAG cache."""
     from lyra.rag_cache import RAGCache

@@ -14,7 +14,6 @@ from emergence_core.lyra.exceptions import (
     ModelLoadError,
     MemoryError,
     ConsciousnessError,
-    RouterError,
     GPUMemoryError,
     ValidationError,
     RateLimitError,
@@ -77,16 +76,6 @@ class TestExceptions:
         
         assert "Emotion update failed" in str(exc)
         assert exc.context["subsystem"] == "emotion_simulator"
-    
-    def test_router_error(self):
-        """Test RouterError."""
-        exc = RouterError(
-            "Specialist selection failed",
-            specialist="code_specialist"
-        )
-        
-        assert "Specialist selection failed" in str(exc)
-        assert exc.context["specialist"] == "code_specialist"
     
     def test_gpu_memory_error(self):
         """Test GPUMemoryError."""
