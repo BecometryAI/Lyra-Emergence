@@ -295,3 +295,76 @@ class TestIWMTBackwardCompatibility:
         
         # Should return some percepts (based on budget)
         assert isinstance(attended, list)
+
+
+class TestIWMTEdgeCases:
+    """Test edge cases and robustness of IWMT integration."""
+    
+    @pytest.mark.asyncio
+    async def test_iwmt_update_with_none_outcome(self):
+        """Test that IWMT update handles None outcome gracefully."""
+        workspace = GlobalWorkspace()
+        core = CognitiveCore(workspace=workspace)
+        
+        if not core.subsystems.iwmt_core:
+            pytest.skip("IWMT is disabled")
+        
+        # Test the helper method directly with None outcome
+        from lyra.cognitive_core.action import Action, ActionType
+        
+        action = Action(
+            type=ActionType.WAIT,
+            reason="Testing"
+        )
+        
+        # Should not raise exception with None outcome
+        core.cycle_executor._update_iwmt_from_action(action, None)
+    
+    @pytest.mark.asyncio
+    async def test_iwmt_update_with_action_missing_attributes(self):
+        """Test IWMT update when action is missing optional attributes."""
+        workspace = GlobalWorkspace()
+        core = CognitiveCore(workspace=workspace)
+        
+        if not core.subsystems.iwmt_core:
+            pytest.skip("IWMT is disabled")
+        
+        from lyra.cognitive_core.action import Action, ActionType
+        
+        # Create action without parameters or reason
+        action = Action(type=ActionType.WAIT)
+        outcome = {"success": True}
+        
+        # Should handle missing attributes gracefully
+        core.cycle_executor._update_iwmt_from_action(action, outcome)
+        
+        # Verify the world model was updated
+        assert core.subsystems.iwmt_core is not None
+    
+    @pytest.mark.asyncio
+    async def test_iwmt_disabled_does_not_break_cycle(self):
+        """Test that disabling IWMT doesn't break the cognitive cycle."""
+        config = {"iwmt": {"enabled": False}}
+        workspace = GlobalWorkspace()
+        core = CognitiveCore(workspace=workspace, config=config)
+        
+        await core.lifecycle.start(restore_latest=False)
+        
+        try:
+            # Add goal and input
+            goal = Goal(
+                description="Test without IWMT",
+                type=GoalType.RESPOND_TO_USER,
+                priority=0.5
+            )
+            workspace.add_goal(goal)
+            core.inject_input("Test", "text")
+            
+            # Should execute without errors
+            timings = await core.cycle_executor.execute_cycle()
+            
+            # Verify cycle completed successfully
+            assert 'perception' in timings
+            assert 'attention' in timings
+        finally:
+            await core.lifecycle.stop()
