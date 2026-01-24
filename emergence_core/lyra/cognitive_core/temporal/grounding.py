@@ -214,12 +214,16 @@ class TemporalGrounding:
         self._last_output_time = time or datetime.now()
         logger.debug(f"📤 Output recorded at {self._last_output_time}")
     
-    def get_temporal_context(self) -> Dict[str, Any]:
+    def get_temporal_context(self, increment_cycle: bool = True) -> Dict[str, Any]:
         """
         Get temporal context for the current cognitive cycle.
         
         This method returns temporal awareness information that should be
         passed to subsystems and included in workspace broadcasts.
+        
+        Args:
+            increment_cycle: Whether to increment the cycle counter (default: True).
+                             Set to False if calling multiple times within the same cycle.
         
         Returns:
             Dictionary with temporal context including:
@@ -233,7 +237,10 @@ class TemporalGrounding:
             - session_id: Current session identifier
         """
         now = datetime.now()
-        self._cycle_count += 1
+        
+        # Only increment cycle count if requested
+        if increment_cycle:
+            self._cycle_count += 1
         
         # Get session information
         session_start = None

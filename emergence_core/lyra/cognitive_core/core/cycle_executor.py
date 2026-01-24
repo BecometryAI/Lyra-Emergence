@@ -55,6 +55,10 @@ class CycleExecutor:
         self._current_predictions = []
         self._current_prediction_errors = []
     
+    def _has_temporal_grounding(self) -> bool:
+        """Check if temporal grounding subsystem is available."""
+        return hasattr(self.subsystems, 'temporal_grounding') and self.subsystems.temporal_grounding is not None
+    
     async def execute_cycle(self) -> Dict[str, float]:
         """
         Execute one complete cognitive cycle with error handling.
@@ -70,7 +74,7 @@ class CycleExecutor:
         # 0a. TEMPORAL CONTEXT: Fetch temporal awareness at cycle start
         try:
             step_start = time.time()
-            if hasattr(self.subsystems, 'temporal_grounding') and self.subsystems.temporal_grounding:
+            if self._has_temporal_grounding():
                 temporal_context = self.subsystems.temporal_grounding.get_temporal_context()
                 self.state.workspace.set_temporal_context(temporal_context)
                 logger.debug(
@@ -113,7 +117,7 @@ class CycleExecutor:
             new_percepts = await self.state.gather_percepts(self.subsystems.perception)
             
             # Record input time if we got new percepts
-            if new_percepts and hasattr(self.subsystems, 'temporal_grounding') and self.subsystems.temporal_grounding:
+            if new_percepts and self._has_temporal_grounding():
                 self.subsystems.temporal_grounding.record_input()
             
             subsystem_timings['perception'] = (time.time() - step_start) * 1000
@@ -218,7 +222,7 @@ class CycleExecutor:
             await self._execute_actions()
             
             # Record action time if we have temporal grounding
-            if hasattr(self.subsystems, 'temporal_grounding') and self.subsystems.temporal_grounding:
+            if self._has_temporal_grounding():
                 self.subsystems.temporal_grounding.record_action()
             
             subsystem_timings['action'] = (time.time() - step_start) * 1000

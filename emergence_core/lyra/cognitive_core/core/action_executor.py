@@ -42,6 +42,10 @@ class ActionExecutor:
         self.subsystems = subsystems
         self.state = state
     
+    def _has_temporal_grounding(self) -> bool:
+        """Check if temporal grounding subsystem is available."""
+        return hasattr(self.subsystems, 'temporal_grounding') and self.subsystems.temporal_grounding is not None
+    
     async def execute(self, action) -> None:
         """
         Execute a single action.
@@ -102,7 +106,7 @@ class ActionExecutor:
             logger.info(f"🗣️ Lyra: {response[:100]}...")
             
             # Record output time if temporal grounding available
-            if hasattr(self.subsystems, 'temporal_grounding') and self.subsystems.temporal_grounding:
+            if self._has_temporal_grounding():
                 self.subsystems.temporal_grounding.record_output()
             
             # Record output in communication drive system
@@ -145,7 +149,7 @@ class ActionExecutor:
             logger.info(f"🗣️💭 Lyra (autonomous): {response[:100]}...")
             
             # Record output time if temporal grounding available
-            if hasattr(self.subsystems, 'temporal_grounding') and self.subsystems.temporal_grounding:
+            if self._has_temporal_grounding():
                 self.subsystems.temporal_grounding.record_output()
             
             # Record output in communication drive system

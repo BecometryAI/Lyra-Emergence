@@ -262,7 +262,7 @@ class GlobalWorkspace:
             memories=[m.model_dump() for m in self.attended_memories],
             timestamp=self.timestamp,
             cycle_count=self.cycle_count,
-            temporal_context=self.temporal_context.copy() if self.temporal_context else None,
+            temporal_context=dict(self.temporal_context) if self.temporal_context else None,
         )
 
     def update(self, subsystem_outputs: List[Any]) -> None:
