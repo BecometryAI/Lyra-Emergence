@@ -69,7 +69,7 @@ class SubsystemCoordinator:
         # Initialize affect subsystem first (needed by attention and action)
         self.affect = AffectSubsystem(config=config.get("affect", {}))
 
-        # Initialize action-outcome learner for IWMT (lightweight, only when IWMT enabled)
+        # Initialize action outcome learner for IWMT (lightweight, only when IWMT enabled)
         iwmt_config = config.get("iwmt", {"enabled": True})
         if iwmt_config.get("enabled", True):
             from ..iwmt_core import IWMTCore
