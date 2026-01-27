@@ -1,7 +1,7 @@
 """
 Test for Lyra Metacognition System
 """
-from mind.metacognition import MetaCognition
+from sanctuary.mind.metacognition import MetaCognition
 import tempfile
 
 def test_metacognition():

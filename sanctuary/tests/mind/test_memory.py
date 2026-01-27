@@ -6,7 +6,7 @@ Test for Lyra Persistent Memory System
 """
 
 # Import from memory_legacy.py (renamed from memory.py)
-from mind.memory_legacy import MemoryManager
+from sanctuary.mind.memory_legacy import MemoryManager
 from chromadb.config import Settings
 from unittest.mock import Mock
 
