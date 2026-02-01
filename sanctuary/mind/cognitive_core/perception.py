@@ -81,46 +81,16 @@ class PerceptionSubsystem:
     """
     Converts raw multimodal inputs into internal vector representations.
 
-    The PerceptionSubsystem is the boundary between the external world and the
-    internal cognitive architecture. It uses specialized encoding models (not
-    generative LLMs) to transform raw sensory inputs into a common vector space
-    that can be processed by the attention and workspace systems.
+    Uses encoding models (not generative LLMs) to transform sensory inputs
+    into a common vector space for attention and workspace systems.
 
-    Key Responsibilities:
-    - Encode text inputs using language embedding models
-    - Encode visual inputs using vision transformers or CLIP-style models
-    - Encode audio inputs using audio embedding models
-    - Maintain consistent embedding spaces across modalities
-    - Detect and flag perceptual anomalies or low-confidence encodings
-    - Buffer recent percepts for temporal context
-
-    Integration Points:
-    - AttentionController: Provides candidate percepts for attention scoring
-    - GlobalWorkspace: Selected percepts enter conscious awareness
-    - CognitiveCore: Receives percepts on each cognitive cycle
-    - LanguageInputParser: Uses perception for text encoding (at periphery)
-
-    Design Philosophy:
-    This subsystem explicitly uses ENCODING models, not generative LLMs. The goal
-    is to create vector representations that capture semantic content without
-    generating new text or imposing linguistic structure on non-linguistic inputs.
-
-    For text: sentence-transformers or similar embedding models
-    For images: CLIP image encoder, vision transformers, or similar
-    For audio: wav2vec, audio spectrogram transformers, or similar
-
-    The perception subsystem does NOT:
-    - Generate text responses (that's LanguageOutputGenerator)
-    - Make decisions about attention (that's AttentionController)
-    - Store long-term memories (that's handled by external memory systems)
-
-    Attributes:
-        text_encoder: Model for encoding text inputs
-        image_encoder: Model for encoding image inputs
-        audio_encoder: Model for encoding audio inputs
-        embedding_dim: Dimensionality of the common embedding space
-        percept_buffer: Recent percepts maintained for temporal context
+    Supported modalities: text, image, audio, sensor, introspection.
     """
+
+    # Cached projection matrices (class-level for efficiency)
+    _audio_projection: Optional[np.ndarray] = None
+    _sensor_projection_cache: Dict[int, np.ndarray] = {}
+    _mel_filterbank_cache: Dict[tuple, np.ndarray] = {}
 
     def __init__(
         self,
@@ -285,6 +255,9 @@ class PerceptionSubsystem:
         ).tolist()
         
         encoding_time = time.time() - start_time
+        # Keep only last 100 encoding times to prevent memory leak
+        if len(self.stats["encoding_times"]) >= 100:
+            self.stats["encoding_times"].pop(0)
         self.stats["encoding_times"].append(encoding_time)
         
         # Cache result (with LRU eviction)
@@ -427,33 +400,24 @@ class PerceptionSubsystem:
 
     def _compute_audio_features(self, audio: np.ndarray, sample_rate: int) -> Dict[str, Any]:
         """
-        Compute comprehensive audio features for embedding.
-
-        Extracts time-domain, spectral, and perceptual features for robust
-        audio representation. Features are designed to capture:
-        - Voice activity and speech characteristics
-        - Musical/tonal content
-        - Environmental sound properties
-
-        Args:
-            audio: Audio samples as numpy array (float32, normalized -1 to 1)
-            sample_rate: Sample rate in Hz
-
-        Returns:
-            Dict of audio features including:
-            - Time-domain: RMS, ZCR, energy statistics
-            - Spectral: centroid, bandwidth, rolloff, flux
-            - MFCCs: 13 coefficients for speech/audio characterization
-            - Pitch: fundamental frequency estimate
+        Compute audio features for embedding: time-domain, spectral, MFCCs, pitch.
         """
         features = {}
 
-        # Ensure float32 and proper shape
+        # Input validation
+        if sample_rate <= 0:
+            logger.warning(f"Invalid sample_rate: {sample_rate}")
+            return {"empty": True}
+
         if audio.dtype != np.float32:
             audio = audio.astype(np.float32)
 
         if len(audio) == 0:
             return {"empty": True}
+
+        # Handle NaN/Inf values
+        if not np.isfinite(audio).all():
+            audio = np.nan_to_num(audio, nan=0.0, posinf=1.0, neginf=-1.0)
 
         # ========== Time-domain features ==========
         features["mean"] = float(np.mean(audio))
@@ -499,60 +463,36 @@ class PerceptionSubsystem:
         # Frequency bins
         freqs = np.fft.rfftfreq(n_fft, 1.0 / sample_rate)
 
-        # ========== Spectral features (per-frame then aggregated) ==========
+        # ========== Spectral features (vectorized) ==========
+        spectra_sum = np.sum(spectra, axis=1, keepdims=True)
+        spectra_sum = np.maximum(spectra_sum, 1e-10)  # Avoid division by zero
 
-        # Spectral centroid (brightness)
-        centroid_per_frame = []
-        for spectrum in spectra:
-            if np.sum(spectrum) > 1e-10:
-                centroid = np.sum(freqs * spectrum) / np.sum(spectrum)
-            else:
-                centroid = 0.0
-            centroid_per_frame.append(centroid)
-
+        # Spectral centroid (brightness) - vectorized
+        centroid_per_frame = np.sum(freqs * spectra, axis=1) / spectra_sum.squeeze()
         features["spectral_centroid_mean"] = float(np.mean(centroid_per_frame))
         features["spectral_centroid_std"] = float(np.std(centroid_per_frame))
 
-        # Spectral bandwidth (spread around centroid)
-        bandwidth_per_frame = []
-        for i, spectrum in enumerate(spectra):
-            if np.sum(spectrum) > 1e-10:
-                centroid = centroid_per_frame[i]
-                bandwidth = np.sqrt(np.sum(((freqs - centroid) ** 2) * spectrum) / np.sum(spectrum))
-            else:
-                bandwidth = 0.0
-            bandwidth_per_frame.append(bandwidth)
-
+        # Spectral bandwidth - vectorized
+        freq_diff_sq = (freqs - centroid_per_frame[:, np.newaxis]) ** 2
+        bandwidth_per_frame = np.sqrt(np.sum(freq_diff_sq * spectra, axis=1) / spectra_sum.squeeze())
         features["spectral_bandwidth_mean"] = float(np.mean(bandwidth_per_frame))
         features["spectral_bandwidth_std"] = float(np.std(bandwidth_per_frame))
 
-        # Spectral rolloff (frequency below which 85% of energy is contained)
-        rolloff_per_frame = []
-        for spectrum in spectra:
-            cumsum = np.cumsum(spectrum)
-            total = cumsum[-1] if cumsum[-1] > 0 else 1.0
-            rolloff_idx = np.searchsorted(cumsum, 0.85 * total)
-            rolloff = freqs[min(rolloff_idx, len(freqs) - 1)]
-            rolloff_per_frame.append(rolloff)
-
+        # Spectral rolloff (85% energy threshold)
+        cumsum = np.cumsum(spectra, axis=1)
+        thresholds = 0.85 * cumsum[:, -1:]
+        rolloff_indices = np.argmax(cumsum >= thresholds, axis=1)
+        rolloff_per_frame = freqs[np.minimum(rolloff_indices, len(freqs) - 1)]
         features["spectral_rolloff_mean"] = float(np.mean(rolloff_per_frame))
 
-        # Spectral flux (rate of change)
-        if len(spectra) > 1:
-            flux = np.mean(np.diff(spectra, axis=0) ** 2)
-            features["spectral_flux"] = float(flux)
-        else:
-            features["spectral_flux"] = 0.0
+        # Spectral flux
+        features["spectral_flux"] = float(np.mean(np.diff(spectra, axis=0) ** 2)) if len(spectra) > 1 else 0.0
 
-        # Spectral flatness (noisiness vs tonality)
-        flatness_per_frame = []
-        for spectrum in power_spectra:
-            spectrum_clean = spectrum + 1e-10  # Avoid log(0)
-            geo_mean = np.exp(np.mean(np.log(spectrum_clean)))
-            arith_mean = np.mean(spectrum_clean)
-            flatness = geo_mean / arith_mean if arith_mean > 0 else 0.0
-            flatness_per_frame.append(flatness)
-
+        # Spectral flatness (vectorized)
+        power_clean = power_spectra + 1e-10
+        geo_mean = np.exp(np.mean(np.log(power_clean), axis=1))
+        arith_mean = np.mean(power_clean, axis=1)
+        flatness_per_frame = geo_mean / np.maximum(arith_mean, 1e-10)
         features["spectral_flatness_mean"] = float(np.mean(flatness_per_frame))
 
         # ========== MFCCs (speech/audio fingerprint) ==========
@@ -645,55 +585,36 @@ class PerceptionSubsystem:
         fmin: float = 0.0,
         fmax: Optional[float] = None
     ) -> np.ndarray:
-        """
-        Create a mel filterbank matrix.
-
-        Args:
-            sample_rate: Sample rate in Hz
-            n_fft: FFT size
-            n_mels: Number of mel bands
-            fmin: Minimum frequency (Hz)
-            fmax: Maximum frequency (Hz), defaults to sample_rate/2
-
-        Returns:
-            Mel filterbank matrix (n_mels, n_fft//2 + 1)
-        """
+        """Create a mel filterbank matrix (cached for efficiency)."""
         if fmax is None:
             fmax = sample_rate / 2.0
 
-        # Mel scale conversion functions
-        def hz_to_mel(hz):
-            return 2595.0 * np.log10(1.0 + hz / 700.0)
+        # Check cache
+        cache_key = (sample_rate, n_fft, n_mels, fmin, fmax)
+        if cache_key in PerceptionSubsystem._mel_filterbank_cache:
+            return PerceptionSubsystem._mel_filterbank_cache[cache_key]
 
-        def mel_to_hz(mel):
-            return 700.0 * (10.0 ** (mel / 2595.0) - 1.0)
+        # Mel scale conversion
+        hz_to_mel = lambda hz: 2595.0 * np.log10(1.0 + hz / 700.0)
+        mel_to_hz = lambda mel: 700.0 * (10.0 ** (mel / 2595.0) - 1.0)
 
-        # Mel points
-        mel_min = hz_to_mel(fmin)
-        mel_max = hz_to_mel(fmax)
-        mel_points = np.linspace(mel_min, mel_max, n_mels + 2)
+        mel_points = np.linspace(hz_to_mel(fmin), hz_to_mel(fmax), n_mels + 2)
         hz_points = mel_to_hz(mel_points)
 
-        # FFT bin frequencies
         n_freq = n_fft // 2 + 1
         fft_freqs = np.linspace(0, sample_rate / 2.0, n_freq)
 
-        # Create filterbank
+        # Vectorized filterbank creation
         filterbank = np.zeros((n_mels, n_freq))
-
         for i in range(n_mels):
-            left = hz_points[i]
-            center = hz_points[i + 1]
-            right = hz_points[i + 2]
-
-            # Left slope
+            left, center, right = hz_points[i], hz_points[i + 1], hz_points[i + 2]
             left_slope = (fft_freqs >= left) & (fft_freqs <= center)
-            filterbank[i, left_slope] = (fft_freqs[left_slope] - left) / (center - left + 1e-10)
-
-            # Right slope
             right_slope = (fft_freqs > center) & (fft_freqs <= right)
+            filterbank[i, left_slope] = (fft_freqs[left_slope] - left) / (center - left + 1e-10)
             filterbank[i, right_slope] = (right - fft_freqs[right_slope]) / (right - center + 1e-10)
 
+        # Cache and return
+        PerceptionSubsystem._mel_filterbank_cache[cache_key] = filterbank
         return filterbank
 
     def _estimate_pitch(
@@ -758,76 +679,41 @@ class PerceptionSubsystem:
         return pitch
 
     def _audio_features_to_embedding(self, features: Dict[str, Any]) -> List[float]:
-        """
-        Map audio features to embedding space.
-
-        Creates a semantically meaningful embedding from audio features by:
-        1. Constructing a feature vector from time-domain, spectral, and MFCC features
-        2. Projecting to embedding dimension using a learned-style projection
-        3. Adding semantic alignment via text encoding of audio descriptors
-
-        The embedding captures audio characteristics while maintaining some
-        semantic compatibility with text embeddings in the same space.
-
-        Args:
-            features: Dict of audio features from _compute_audio_features
-
-        Returns:
-            Normalized embedding vector
-        """
+        """Map audio features to embedding space with semantic alignment."""
         if features.get("empty", False):
             return [0.0] * self.embedding_dim
 
-        # ========== Build structured feature vector ==========
-
-        # Time-domain features (normalized)
-        time_features = [
-            min(features.get("rms", 0.0) * 10, 1.0),  # RMS normalized
-            min(features.get("zcr", 0.0) * 50, 1.0),  # ZCR normalized
+        # Build feature vector (25 features total)
+        all_features = [
+            # Time-domain (4)
+            min(features.get("rms", 0.0) * 10, 1.0),
+            min(features.get("zcr", 0.0) * 50, 1.0),
             min(features.get("energy_ratio", 0.0), 1.0),
-            min(features.get("duration", 0.0) / 10.0, 1.0),  # Duration up to 10s
-        ]
-
-        # Spectral features (normalized to typical ranges)
-        spectral_features = [
+            min(features.get("duration", 0.0) / 10.0, 1.0),
+            # Spectral (6)
             min(features.get("spectral_centroid_mean", 0.0) / 8000.0, 1.0),
             min(features.get("spectral_centroid_std", 0.0) / 2000.0, 1.0),
             min(features.get("spectral_bandwidth_mean", 0.0) / 4000.0, 1.0),
             min(features.get("spectral_rolloff_mean", 0.0) / 10000.0, 1.0),
             min(features.get("spectral_flux", 0.0) * 100, 1.0),
-            features.get("spectral_flatness_mean", 0.0),  # Already 0-1
-        ]
-
-        # MFCCs (already somewhat normalized by DCT)
-        mfcc_features = []
-        for i in range(13):
-            mfcc_val = features.get(f"mfcc_{i}", 0.0)
-            # Normalize MFCCs to roughly -1 to 1 range
-            mfcc_features.append(np.tanh(mfcc_val / 50.0))
-
-        # Pitch features
-        pitch_features = [
+            features.get("spectral_flatness_mean", 0.0),
+            # MFCCs (13)
+            *[np.tanh(features.get(f"mfcc_{i}", 0.0) / 50.0) for i in range(13)],
+            # Pitch (2)
             1.0 if features.get("has_pitch", False) else 0.0,
             min(features.get("pitch_hz", 0.0) / 500.0, 1.0) if features.get("has_pitch", False) else 0.0,
         ]
-
-        # Combine all features
-        all_features = time_features + spectral_features + mfcc_features + pitch_features
         feature_vector = np.array(all_features, dtype=np.float32)
 
-        # ========== Project to embedding dimension ==========
-
-        # Use a deterministic but pseudo-random projection matrix
-        # This creates a stable mapping from features to embedding space
+        # Get or create cached projection matrix
         n_features = len(feature_vector)
+        if PerceptionSubsystem._audio_projection is None or \
+           PerceptionSubsystem._audio_projection.shape != (self.embedding_dim, n_features):
+            rng = np.random.RandomState(42)
+            PerceptionSubsystem._audio_projection = rng.randn(self.embedding_dim, n_features).astype(np.float32)
+            PerceptionSubsystem._audio_projection /= np.sqrt(n_features)
 
-        # Create projection using seeded random for reproducibility
-        rng = np.random.RandomState(42)  # Fixed seed for reproducibility
-        projection_matrix = rng.randn(self.embedding_dim, n_features).astype(np.float32)
-        projection_matrix /= np.sqrt(n_features)  # Normalize columns
-
-        # Project features
-        projected = np.dot(projection_matrix, feature_vector)
+        projected = np.dot(PerceptionSubsystem._audio_projection, feature_vector)
 
         # ========== Add semantic component ==========
 
@@ -1187,38 +1073,23 @@ class PerceptionSubsystem:
         semantic_desc: str,
         sensor_type: str
     ) -> List[float]:
-        """
-        Create hybrid embedding from numerical features and semantic description.
-
-        Blends:
-        - Numerical projection: Direct sensor value representation
-        - Semantic embedding: Text-based meaning alignment
-
-        The blend ratio depends on sensor type:
-        - Motion sensors: More numerical (precise values matter)
-        - Environmental sensors: More semantic (qualitative states matter)
-
-        Args:
-            numerical_features: Dict of normalized numerical features
-            semantic_desc: Text description of sensor state
-            sensor_type: Type of sensor
-
-        Returns:
-            Normalized embedding vector
-        """
-        # ========== Numerical embedding via projection ==========
+        """Blend numerical projection with semantic embedding based on sensor type."""
         feature_values = list(numerical_features.values())
 
         if feature_values:
             feature_vector = np.array(feature_values, dtype=np.float32)
             n_features = len(feature_vector)
 
-            # Deterministic projection matrix
-            rng = np.random.RandomState(43)  # Different seed from audio
-            projection = rng.randn(self.embedding_dim, n_features).astype(np.float32)
-            projection /= np.sqrt(n_features)
+            # Get or create cached projection matrix for this feature count
+            if n_features not in PerceptionSubsystem._sensor_projection_cache:
+                rng = np.random.RandomState(43)
+                proj = rng.randn(self.embedding_dim, n_features).astype(np.float32)
+                PerceptionSubsystem._sensor_projection_cache[n_features] = proj / np.sqrt(n_features)
 
-            numerical_embedding = np.dot(projection, feature_vector)
+            numerical_embedding = np.dot(
+                PerceptionSubsystem._sensor_projection_cache[n_features],
+                feature_vector
+            )
         else:
             numerical_embedding = np.zeros(self.embedding_dim, dtype=np.float32)
 

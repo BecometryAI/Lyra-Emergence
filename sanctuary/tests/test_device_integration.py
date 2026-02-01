@@ -529,3 +529,214 @@ class TestSubsystemCoordinatorIntegration:
         assert isinstance(data, np.ndarray)
 
         await registry.disconnect_all_devices()
+
+
+# ============================================================================
+# Edge Case Tests for Perception Robustness
+# ============================================================================
+
+
+class TestPerceptionEdgeCases:
+    """Tests for edge cases and unusual inputs in perception encoding."""
+
+    @pytest.fixture
+    def perception(self):
+        """Create perception subsystem for tests."""
+        try:
+            from sanctuary.mind.cognitive_core.perception import PerceptionSubsystem
+            return PerceptionSubsystem(config={"text_model": "all-MiniLM-L6-v2"})
+        except ImportError:
+            pytest.skip("sentence-transformers not installed")
+
+    # ========== Audio Edge Cases ==========
+
+    @pytest.mark.asyncio
+    async def test_empty_audio(self, perception) -> None:
+        """Empty audio array returns valid zero embedding."""
+        audio = np.array([], dtype=np.float32)
+        percept = await perception.encode(audio, "audio")
+
+        assert percept is not None
+        assert len(percept.embedding) == perception.embedding_dim
+        assert all(v == 0.0 for v in percept.embedding)
+
+    @pytest.mark.asyncio
+    async def test_single_sample_audio(self, perception) -> None:
+        """Single sample audio returns valid embedding."""
+        audio = np.array([0.5], dtype=np.float32)
+        percept = await perception.encode(audio, "audio")
+
+        assert percept is not None
+        assert len(percept.embedding) == perception.embedding_dim
+
+    @pytest.mark.asyncio
+    async def test_audio_with_nan(self, perception) -> None:
+        """Audio with NaN values is handled gracefully."""
+        audio = np.array([0.1, np.nan, 0.3, np.nan, 0.5], dtype=np.float32)
+        percept = await perception.encode(audio, "audio")
+
+        assert percept is not None
+        assert len(percept.embedding) == perception.embedding_dim
+        # Should not contain NaN
+        assert np.isfinite(percept.embedding).all()
+
+    @pytest.mark.asyncio
+    async def test_audio_with_inf(self, perception) -> None:
+        """Audio with Inf values is handled gracefully."""
+        audio = np.array([0.1, np.inf, 0.3, -np.inf, 0.5], dtype=np.float32)
+        percept = await perception.encode(audio, "audio")
+
+        assert percept is not None
+        assert len(percept.embedding) == perception.embedding_dim
+        assert np.isfinite(percept.embedding).all()
+
+    @pytest.mark.asyncio
+    async def test_silent_audio(self, perception) -> None:
+        """All-zero audio returns valid embedding."""
+        audio = np.zeros(16000, dtype=np.float32)
+        percept = await perception.encode(audio, "audio")
+
+        assert percept is not None
+        assert len(percept.embedding) == perception.embedding_dim
+
+    @pytest.mark.asyncio
+    async def test_very_loud_audio(self, perception) -> None:
+        """Audio with values > 1.0 is handled."""
+        audio = np.random.randn(16000).astype(np.float32) * 100
+        percept = await perception.encode(audio, "audio")
+
+        assert percept is not None
+        assert len(percept.embedding) == perception.embedding_dim
+        assert np.isfinite(percept.embedding).all()
+
+    @pytest.mark.asyncio
+    async def test_audio_dict_with_metadata(self, perception) -> None:
+        """Audio in dict format with sample_rate metadata works."""
+        audio_dict = {
+            "data": np.random.randn(8000).astype(np.float32) * 0.1,
+            "sample_rate": 8000,
+        }
+        percept = await perception.encode(audio_dict, "audio")
+
+        assert percept is not None
+        assert len(percept.embedding) == perception.embedding_dim
+
+    # ========== Sensor Edge Cases ==========
+
+    @pytest.mark.asyncio
+    async def test_sensor_missing_keys(self, perception) -> None:
+        """Sensor dict with missing keys still encodes."""
+        sensor_data = {"sensor_type": "TEMPERATURE"}  # No value key
+        percept = await perception.encode(sensor_data, "sensor")
+
+        assert percept is not None
+        assert len(percept.embedding) == perception.embedding_dim
+
+    @pytest.mark.asyncio
+    async def test_sensor_extreme_values(self, perception) -> None:
+        """Sensor with extreme values is handled."""
+        sensor_data = {
+            "sensor_type": "TEMPERATURE",
+            "value": 1e10,  # Extremely hot
+            "unit": "celsius",
+        }
+        percept = await perception.encode(sensor_data, "sensor")
+
+        assert percept is not None
+        assert np.isfinite(percept.embedding).all()
+
+    @pytest.mark.asyncio
+    async def test_sensor_negative_values(self, perception) -> None:
+        """Sensor with negative values works."""
+        sensor_data = {
+            "sensor_type": "TEMPERATURE",
+            "value": -273.15,  # Absolute zero
+            "unit": "celsius",
+        }
+        percept = await perception.encode(sensor_data, "sensor")
+
+        assert percept is not None
+        assert len(percept.embedding) == perception.embedding_dim
+
+    @pytest.mark.asyncio
+    async def test_sensor_unknown_type(self, perception) -> None:
+        """Unknown sensor type falls back to generic encoding."""
+        sensor_data = {
+            "sensor_type": "UNKNOWN_QUANTUM_SENSOR",
+            "value": 42.0,
+        }
+        percept = await perception.encode(sensor_data, "sensor")
+
+        assert percept is not None
+        assert len(percept.embedding) == perception.embedding_dim
+
+    @pytest.mark.asyncio
+    async def test_sensor_multi_axis_missing_keys(self, perception) -> None:
+        """Multi-axis sensor with missing axis keys works."""
+        sensor_data = {
+            "sensor_type": "ACCELEROMETER",
+            "value": {"x": 9.8},  # Missing y and z
+        }
+        percept = await perception.encode(sensor_data, "sensor")
+
+        assert percept is not None
+        assert len(percept.embedding) == perception.embedding_dim
+
+    @pytest.mark.asyncio
+    async def test_sensor_as_list(self, perception) -> None:
+        """Sensor value as list (time series) works."""
+        sensor_data = {
+            "sensor_type": "CUSTOM",
+            "value": [1.0, 2.0, 3.0, 4.0, 5.0],
+        }
+        percept = await perception.encode(sensor_data, "sensor")
+
+        assert percept is not None
+        assert len(percept.embedding) == perception.embedding_dim
+
+    @pytest.mark.asyncio
+    async def test_sensor_raw_float(self, perception) -> None:
+        """Raw float as sensor data works."""
+        percept = await perception.encode(42.5, "sensor")
+
+        assert percept is not None
+        assert len(percept.embedding) == perception.embedding_dim
+
+    # ========== Caching Tests ==========
+
+    @pytest.mark.asyncio
+    async def test_projection_matrix_caching(self, perception) -> None:
+        """Projection matrices are cached between calls."""
+        from sanctuary.mind.cognitive_core.perception import PerceptionSubsystem
+
+        # Clear caches
+        PerceptionSubsystem._audio_projection = None
+        PerceptionSubsystem._sensor_projection_cache.clear()
+
+        # First encoding creates projection
+        audio1 = np.random.randn(16000).astype(np.float32) * 0.1
+        await perception.encode(audio1, "audio")
+
+        # Verify projection was cached
+        assert PerceptionSubsystem._audio_projection is not None
+
+        # Second encoding should reuse cached projection
+        audio2 = np.random.randn(16000).astype(np.float32) * 0.1
+        await perception.encode(audio2, "audio")
+
+        # Should still be the same object
+        assert PerceptionSubsystem._audio_projection is not None
+
+    @pytest.mark.asyncio
+    async def test_mel_filterbank_caching(self, perception) -> None:
+        """Mel filterbank is cached between calls."""
+        from sanctuary.mind.cognitive_core.perception import PerceptionSubsystem
+
+        initial_cache_size = len(PerceptionSubsystem._mel_filterbank_cache)
+
+        # Encode audio (creates mel filterbank for this sample rate/fft size)
+        audio = np.random.randn(16000).astype(np.float32) * 0.1
+        await perception.encode(audio, "audio")
+
+        # Cache should have grown
+        assert len(PerceptionSubsystem._mel_filterbank_cache) >= initial_cache_size
