@@ -33,6 +33,7 @@ class InhibitionType(Enum):
     STILL_PROCESSING = "still_processing" # Not ready to respond yet
     UNCERTAINTY = "uncertainty"           # Too uncertain to commit to a response
     RECENT_OUTPUT = "recent_output"       # High output frequency, give space
+    SYSTEM_OVERLOAD = "system_overload"   # Cognitive system is bottlenecked
 
 
 @dataclass

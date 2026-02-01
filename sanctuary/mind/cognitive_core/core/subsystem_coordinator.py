@@ -15,7 +15,7 @@ from ..attention import AttentionController
 from ..perception import PerceptionSubsystem
 from ..action import ActionSubsystem
 from ..affect import AffectSubsystem
-from ..meta_cognition import SelfMonitor, IntrospectiveJournal
+from ..meta_cognition import SelfMonitor, IntrospectiveJournal, BottleneckDetector
 from ..memory_integration import MemoryIntegration
 from ..language_input import LanguageInputParser
 from ..language_output import LanguageOutputGenerator
@@ -125,7 +125,13 @@ class SubsystemCoordinator:
         journal_dir = Path(config.get("journal_dir", "data/introspection"))
         journal_dir.mkdir(parents=True, exist_ok=True)
         self.introspective_journal = IntrospectiveJournal(journal_dir)
-        
+
+        # Initialize bottleneck detector for cognitive load monitoring
+        self.bottleneck_detector = BottleneckDetector(
+            config=config.get("bottleneck_detection", {})
+        )
+        logger.debug("🔍 Bottleneck detector initialized")
+
         # Initialize memory integration
         self.memory = MemoryIntegration(
             workspace=workspace,

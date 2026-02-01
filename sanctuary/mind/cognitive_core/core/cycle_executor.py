@@ -271,7 +271,16 @@ class CycleExecutor:
         except Exception as e:
             logger.error(f"Memory consolidation step failed: {e}", exc_info=True)
             subsystem_timings['memory_consolidation'] = 0.0
-        
+
+        # 9.5. BOTTLENECK DETECTION: Monitor cognitive load
+        try:
+            step_start = time.time()
+            await self._update_bottleneck_detection(subsystem_timings)
+            subsystem_timings['bottleneck_detection'] = (time.time() - step_start) * 1000
+        except Exception as e:
+            logger.error(f"Bottleneck detection step failed: {e}", exc_info=True)
+            subsystem_timings['bottleneck_detection'] = 0.0
+
         # 10. IDENTITY UPDATE: Periodically recompute identity from system state
         # Update every 100 cycles to avoid overhead
         if self.state.workspace.cycle_count % 100 == 0:
@@ -472,7 +481,65 @@ class CycleExecutor:
             updates.append({'type': 'percept', 'data': meta_percept})
         
         self.state.workspace.update(updates)
-    
+
+    async def _update_bottleneck_detection(self, subsystem_timings: Dict[str, float]) -> None:
+        """
+        Update bottleneck detection with current cycle metrics.
+
+        Monitors cognitive load and generates inhibition signals if overloaded.
+        Also generates introspective percepts about overwhelm states.
+        """
+        if not hasattr(self.subsystems, 'bottleneck_detector'):
+            return
+
+        # Get current metrics
+        snapshot = self.state.workspace.broadcast()
+        workspace_percept_count = len(snapshot.percepts)
+
+        # Get goal competition metrics if available
+        goal_resource_utilization = 0.0
+        waiting_goals = 0
+        if hasattr(self.state.workspace, 'goal_competition'):
+            try:
+                metrics = self.state.workspace.goal_competition.get_metrics()
+                goal_resource_utilization = metrics.total_resource_utilization
+                waiting_goals = metrics.waiting_goals
+            except Exception:
+                pass
+
+        goal_queue_depth = len(list(self.state.workspace.current_goals))
+
+        # Update bottleneck detector
+        bottleneck_state = self.subsystems.bottleneck_detector.update(
+            subsystem_timings=subsystem_timings,
+            workspace_percept_count=workspace_percept_count,
+            goal_resource_utilization=goal_resource_utilization,
+            goal_queue_depth=goal_queue_depth,
+            waiting_goals=waiting_goals
+        )
+
+        # If bottlenecked, add inhibition to communication system
+        if bottleneck_state.is_bottlenecked:
+            if hasattr(self.subsystems, 'communication_inhibitions'):
+                from ..communication import InhibitionType, InhibitionFactor
+                from datetime import timedelta
+
+                # Add system overload inhibition
+                severity = bottleneck_state.get_severity()
+                inhibition = InhibitionFactor(
+                    inhibition_type=InhibitionType.SYSTEM_OVERLOAD,
+                    strength=severity,
+                    reason=f"Cognitive system bottlenecked: {bottleneck_state.recommendation}",
+                    priority=0.9,  # High priority - system health
+                    duration=timedelta(seconds=5)  # Re-evaluate after 5s
+                )
+                self.subsystems.communication_inhibitions.active_inhibitions.append(inhibition)
+
+            # Log introspective text if available
+            introspection_text = self.subsystems.bottleneck_detector.get_introspection_text()
+            if introspection_text:
+                logger.info(f"🧠 Bottleneck introspection: {introspection_text[:100]}...")
+
     def _update_iwmt_from_action(self, action, actual_outcome: Dict[str, Any]) -> None:
         """
         Update IWMT world model with action outcome.

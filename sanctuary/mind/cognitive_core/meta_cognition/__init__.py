@@ -639,6 +639,12 @@ from .system import (
     MetaCognitiveSystem,
     SelfAssessment,
 )
+from .bottleneck_detector import (
+    BottleneckDetector,
+    BottleneckSignal,
+    BottleneckState,
+    BottleneckType,
+)
 
 # Export main classes for backward compatibility
 __all__ = [
@@ -665,4 +671,9 @@ __all__ = [
     "AttentionPattern",
     "MetaCognitiveSystem",
     "SelfAssessment",
+    # Bottleneck detection
+    "BottleneckDetector",
+    "BottleneckSignal",
+    "BottleneckState",
+    "BottleneckType",
 ]

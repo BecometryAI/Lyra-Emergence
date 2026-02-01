@@ -256,7 +256,7 @@ Connect newly implemented systems to the cognitive loop:
 | Task | Priority | Status | Description |
 |------|----------|--------|-------------|
 | ~~Wire action-outcome learning to action selection~~ | P0 | ✅ **COMPLETE** | ActionOutcomeLearner integrated with IWMTCore for action reliability tracking |
-| Add processing bottleneck detection | P1 | Pending | Meta-cognition should detect when workspace is overloaded |
+| ~~Add processing bottleneck detection~~ | P1 | ✅ **COMPLETE** | BottleneckDetector monitors cognitive load, routes to inhibition system and introspection |
 | Implement confidence-based action modulation | P1 | Pending | Low confidence should trigger more cautious behavior |
 
 ---
