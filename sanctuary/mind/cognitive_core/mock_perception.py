@@ -1,1 +1,108 @@
-"""\nMock Perception Subsystem for boot testing and development.\n\nProvides a drop-in replacement for PerceptionSubsystem that uses\ndeterministic random projections instead of sentence-transformers.\nIdentical inputs always produce identical embeddings (seeded by hash),\npreserving the contract that perception provides consistent representations.\n\nUsage:\n    perception = MockPerceptionSubsystem(config={"mock_embedding_dim": 384})\n    percept = await perception.encode("hello", "text")\n"""\n\nfrom __future__ import annotations\n\nimport hashlib\nimport logging\nimport time\nfrom typing import Optional, Dict, Any, List\nfrom collections import OrderedDict\nfrom datetime import datetime\n\nimport numpy as np\n\nlogger = logging.getLogger(__name__)\n\n\nclass MockPerceptionSubsystem:\n    """\n    Deterministic mock perception for testing without ML model dependencies.\n\n    Implements the same public API as PerceptionSubsystem:\n    - encode(raw_input, modality) -> Percept\n    - process(raw_input) -> Percept (legacy)\n    - clear_cache()\n    - get_stats()\n\n    Embeddings are deterministic: same input -> same embedding (via hash seeding).\n    Different inputs produce different, normalized vectors in the same space.\n    """\n\n    def __init__(self, config: Optional[Dict] = None) -> None:\n        self.config = config or {}\n        self.embedding_dim = self.config.get("mock_embedding_dim", 384)\n\n        # Cache (same interface as real PerceptionSubsystem)\n        self.embedding_cache: OrderedDict[str, List[float]] = OrderedDict()\n        self.cache_size = self.config.get("cache_size", 1000)\n\n        # Stats tracking\n        self.stats = {\n            "cache_hits": 0,\n            "cache_misses": 0,\n            "total_encodings": 0,\n            "encoding_times": [],\n        }\n\n        logger.info(\n            f"\u2705 MockPerceptionSubsystem initialized (dim={self.embedding_dim}) "\n            f"\u2014 deterministic random projection mode"\n        )\n\n    async def encode(self, raw_input: Any, modality: str) -> Any:\n        """\n        Encode raw input into Percept with deterministic mock embedding.\n\n        Args:\n            raw_input: Raw data to encode\n            modality: Type of input (\"text\", \"image\", \"audio\", \"sensor\", \"introspection\")\n\n        Returns:\n            Percept object with embedding and metadata\n        """\n        from .workspace import Percept as WorkspacePercept\n\n        try:\n            # Convert any input to text for hashing\n            text_repr = str(raw_input)\n            embedding = self._deterministic_embedding(text_repr)\n            complexity = self._compute_complexity(raw_input, modality)\n\n            percept = WorkspacePercept(\n                modality=modality,\n                raw=raw_input,\n                embedding=embedding,\n                complexity=complexity,\n                timestamp=datetime.now(),\n                metadata={"encoding_model": "mock-deterministic", "mock_mode": True},\n            )\n\n            self.stats["total_encodings"] += 1\n            return percept\n\n        except Exception as e:\n            logger.error(f"Error in mock encoding {modality} input: {e}", exc_info=True)\n            from .workspace import Percept as WorkspacePercept\n\n            return WorkspacePercept(\n                modality=modality,\n                raw=raw_input,\n                embedding=[0.0] * self.embedding_dim,\n                complexity=1,\n                metadata={"error": str(e), "mock_mode": True},\n            )\n\n    def _deterministic_embedding(self, text: str) -> List[float]:\n        """\n        Generate a deterministic embedding from text via hash-seeded RNG.\n\n        Same input always produces same output. Different inputs produce\n        different normalized vectors.\n        """\n        cache_key = hashlib.md5(text.encode()).hexdigest()\n\n        # Check cache\n        if cache_key in self.embedding_cache:\n            self.stats["cache_hits"] += 1\n            self.embedding_cache.move_to_end(cache_key)\n            return self.embedding_cache[cache_key]\n\n        self.stats["cache_misses"] += 1\n        start_time = time.time()\n\n        # Deterministic embedding via hash seed\n        seed = int(cache_key[:8], 16)\n        rng = np.random.RandomState(seed)\n        embedding = rng.randn(self.embedding_dim).astype(np.float32)\n\n        # Normalize\n        norm = np.linalg.norm(embedding)\n        if norm > 0:\n            embedding = embedding / norm\n\n        result = embedding.tolist()\n\n        encoding_time = time.time() - start_time\n        if len(self.stats["encoding_times"]) >= 100:\n            self.stats["encoding_times"].pop(0)\n        self.stats["encoding_times"].append(encoding_time)\n\n        # Cache with LRU eviction\n        if len(self.embedding_cache) >= self.cache_size:\n            self.embedding_cache.popitem(last=False)\n        self.embedding_cache[cache_key] = result\n\n        return result\n\n    def _compute_complexity(self, raw_input: Any, modality: str) -> int:\n        """Estimate attention cost (same logic as real PerceptionSubsystem)."""\n        if modality == "text":\n            text_length = len(str(raw_input))\n            return min(max(text_length // 20, 5), 50)\n        elif modality == "image":\n            return 30\n        elif modality == "audio":\n            if isinstance(raw_input, dict):\n                duration = raw_input.get("duration_seconds", 5)\n            else:\n                duration = 5\n            return min(int(duration * 5), 80)\n        elif modality == "introspection":\n            return 20\n        elif modality == "sensor":\n            return 5\n        else:\n            return 10\n\n    def clear_cache(self) -> None:\n        """Clear embedding cache."""\n        self.embedding_cache.clear()\n        logger.info("Mock embedding cache cleared")\n\n    def get_stats(self) -> Dict[str, Any]:\n        """Return encoding statistics."""\n        total_requests = self.stats["cache_hits"] + self.stats["cache_misses"]\n        cache_hit_rate = (\n            self.stats["cache_hits"] / total_requests if total_requests > 0 else 0.0\n        )\n        avg_encoding_time = (\n            sum(self.stats["encoding_times"]) / len(self.stats["encoding_times"])\n            if self.stats["encoding_times"]\n            else 0.0\n        )\n        return {\n            "cache_hit_rate": cache_hit_rate,\n            "cache_hits": self.stats["cache_hits"],\n            "cache_misses": self.stats["cache_misses"],\n            "total_encodings": self.stats["total_encodings"],\n            "average_encoding_time_ms": avg_encoding_time * 1000,\n            "cache_size": len(self.embedding_cache),\n            "embedding_dim": self.embedding_dim,\n            "mock_mode": True,\n        }\n\n    async def process(self, raw_input: Any) -> Any:\n        """Legacy compatibility method."""\n        return await self.encode(raw_input, "text")\n
+"""
+Mock Perception Subsystem for boot testing.
+
+Drop-in replacement for PerceptionSubsystem using deterministic random
+projections instead of sentence-transformers. Same input -> same embedding.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import logging
+import time
+from typing import Optional, Dict, Any, List
+from collections import OrderedDict
+from datetime import datetime
+
+import numpy as np
+
+logger = logging.getLogger(__name__)
+
+
+class MockPerceptionSubsystem:
+    """Deterministic mock perception. Same public API as PerceptionSubsystem."""
+
+    def __init__(self, config: Optional[Dict] = None) -> None:
+        self.config = config or {}
+        self.embedding_dim = self.config.get("mock_embedding_dim", 384)
+        self.embedding_cache: OrderedDict[str, List[float]] = OrderedDict()
+        self.cache_size = self.config.get("cache_size", 1000)
+        self.stats = {
+            "cache_hits": 0, "cache_misses": 0,
+            "total_encodings": 0, "encoding_times": [],
+        }
+        logger.info(f"\u2705 MockPerceptionSubsystem initialized (dim={self.embedding_dim})")
+
+    async def encode(self, raw_input: Any, modality: str) -> Any:
+        from .workspace import Percept as WorkspacePercept
+        try:
+            embedding = self._deterministic_embedding(str(raw_input))
+            complexity = self._compute_complexity(raw_input, modality)
+            percept = WorkspacePercept(
+                modality=modality, raw=raw_input, embedding=embedding,
+                complexity=complexity, timestamp=datetime.now(),
+                metadata={"encoding_model": "mock-deterministic", "mock_mode": True},
+            )
+            self.stats["total_encodings"] += 1
+            return percept
+        except Exception as e:
+            logger.error(f"Mock encode error: {e}", exc_info=True)
+            return WorkspacePercept(
+                modality=modality, raw=raw_input,
+                embedding=[0.0] * self.embedding_dim, complexity=1,
+                metadata={"error": str(e), "mock_mode": True},
+            )
+
+    def _deterministic_embedding(self, text: str) -> List[float]:
+        cache_key = hashlib.md5(text.encode()).hexdigest()
+        if cache_key in self.embedding_cache:
+            self.stats["cache_hits"] += 1
+            self.embedding_cache.move_to_end(cache_key)
+            return self.embedding_cache[cache_key]
+
+        self.stats["cache_misses"] += 1
+        start = time.time()
+        seed = int(cache_key[:8], 16)
+        rng = np.random.RandomState(seed)
+        emb = rng.randn(self.embedding_dim).astype(np.float32)
+        norm = np.linalg.norm(emb)
+        if norm > 0:
+            emb = emb / norm
+        result = emb.tolist()
+
+        if len(self.stats["encoding_times"]) >= 100:
+            self.stats["encoding_times"].pop(0)
+        self.stats["encoding_times"].append(time.time() - start)
+        if len(self.embedding_cache) >= self.cache_size:
+            self.embedding_cache.popitem(last=False)
+        self.embedding_cache[cache_key] = result
+        return result
+
+    def _compute_complexity(self, raw_input: Any, modality: str) -> int:
+        if modality == "text":
+            return min(max(len(str(raw_input)) // 20, 5), 50)
+        elif modality == "image":
+            return 30
+        elif modality == "audio":
+            d = raw_input.get("duration_seconds", 5) if isinstance(raw_input, dict) else 5
+            return min(int(d * 5), 80)
+        elif modality == "introspection":
+            return 20
+        elif modality == "sensor":
+            return 5
+        return 10
+
+    def clear_cache(self) -> None:
+        self.embedding_cache.clear()
+
+    def get_stats(self) -> Dict[str, Any]:
+        total = self.stats["cache_hits"] + self.stats["cache_misses"]
+        return {
+            "cache_hit_rate": self.stats["cache_hits"] / total if total else 0.0,
+            "total_encodings": self.stats["total_encodings"],
+            "embedding_dim": self.embedding_dim,
+            "mock_mode": True,
+        }
+
+    async def process(self, raw_input: Any) -> Any:
+        return await self.encode(raw_input, "text")
