@@ -11,8 +11,8 @@ import ast
 import inspect
 from pathlib import Path
 
-# Add sanctuary to path
-sys.path.insert(0, str(Path(__file__).parent / "sanctuary"))
+# Add emergence_core to path
+sys.path.insert(0, str(Path(__file__).parent / "emergence_core"))
 
 def validate_file_syntax(filepath):
     """Check if a Python file has valid syntax."""
@@ -39,9 +39,9 @@ def main():
     # Check syntax of main files
     print("\n1. Validating Python syntax...")
     files_to_check = [
-        "sanctuary/mind/cognitive_core/perception.py",
-        "sanctuary/mind/cognitive_core/core.py",
-        "sanctuary/tests/test_perception.py",
+        "emergence_core/sanctuary/cognitive_core/perception.py",
+        "emergence_core/sanctuary/cognitive_core/core.py",
+        "emergence_core/tests/test_perception.py",
     ]
     
     all_valid = True
@@ -61,7 +61,7 @@ def main():
     print("\n2. Checking PerceptionSubsystem structure...")
     
     # Parse the perception.py file to check for required elements
-    with open("sanctuary/mind/cognitive_core/perception.py", 'r') as f:
+    with open("emergence_core/sanctuary/cognitive_core/perception.py", 'r') as f:
         content = f.read()
     
     required_elements = [
@@ -99,7 +99,7 @@ def main():
     # Check core.py updates
     print("\n3. Checking CognitiveCore integration...")
     
-    with open("sanctuary/mind/cognitive_core/core.py", 'r') as f:
+    with open("emergence_core/sanctuary/cognitive_core/core.py", 'r') as f:
         core_content = f.read()
     
     required_core_changes = [
@@ -124,7 +124,7 @@ def main():
     # Check test structure
     print("\n4. Checking test coverage...")
     
-    with open("sanctuary/tests/test_perception.py", 'r') as f:
+    with open("emergence_core/tests/test_perception.py", 'r') as f:
         test_content = f.read()
     
     required_tests = [

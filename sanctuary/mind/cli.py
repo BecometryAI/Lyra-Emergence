@@ -1,18 +1,18 @@
 """
 Simple CLI for testing Sanctuary conversational interface.
 
-This is a basic command-line interface for interacting with the Sanctuary cognitive core
+This is a basic command-line interface for interacting with Sanctuary's cognitive core
 through natural conversation. It demonstrates the use of the SanctuaryAPI for
 multi-turn dialogue.
 
 Usage:
-    python -m sanctuary.mind.cli
-
+    python -m sanctuary.cli
+    
     Or:
     python sanctuary/mind/cli.py
 
 Commands:
-    - Type any message to chat with the system
+    - Type any message to chat with Sanctuary
     - Type 'quit' or 'exit' to exit
     - Type 'reset' to clear conversation history
     - Type 'history' to see recent conversation
@@ -35,13 +35,13 @@ except ImportError:
 
 
 async def main():
-    """Main CLI loop for interacting with the system."""
+    """Main CLI loop for interacting with Sanctuary."""
     # Initialize Sanctuary
     print("🧠 Initializing Sanctuary...")
-    api = SanctuaryAPI()
-    
+    sanctuary = SanctuaryAPI()
+
     try:
-        await api.start()
+        await sanctuary.start()
         print("✅ Sanctuary is online. Type 'help' for commands or 'quit' to exit.\n")
         
         while True:
@@ -77,29 +77,29 @@ async def main():
                 print("   memory gc --dry-run - Preview what would be removed")
                 print("   memory autogc on    - Enable automatic GC")
                 print("   memory autogc off   - Disable automatic GC")
-                print("\n   Any other text will be sent to the system for conversation.\n")
+                print("\n   Any other text will be sent to Sanctuary for conversation.\n")
                 continue
             
             if user_input.lower() == "reset":
-                api.reset_conversation()
+                sanctuary.reset_conversation()
                 print("🔄 Conversation reset.\n")
                 continue
             
             if user_input.lower() == "history":
-                history = api.get_conversation_history(10)
+                history = sanctuary.get_conversation_history(10)
                 if not history:
                     print("No conversation history yet.\n")
                 else:
                     print("\n📜 Recent conversation:")
                     for i, turn in enumerate(history, 1):
                         print(f"\n{i}. You: {turn.user_input}")
-                        print(f"   System: {turn.system_response}")
+                        print(f"   Sanctuary: {turn.system_response}")
                         print(f"   (Response time: {turn.response_time:.2f}s)")
                     print()
                 continue
             
             if user_input.lower() == "metrics":
-                metrics = api.get_metrics()
+                metrics = sanctuary.get_metrics()
                 print("\n📊 Conversation Metrics:")
                 print(f"   Total turns: {metrics['conversation']['total_turns']}")
                 print(f"   Average response time: {metrics['conversation']['avg_response_time']:.2f}s")
@@ -119,7 +119,7 @@ async def main():
             if user_input.lower().startswith("save"):
                 parts = user_input.split(maxsplit=1)
                 label = parts[1] if len(parts) > 1 else None
-                path = api.core.save_state(label)
+                path = sanctuary.core.save_state(label)
                 if path:
                     print(f"💾 State saved: {path.name}\n")
                 else:
@@ -127,11 +127,11 @@ async def main():
                 continue
             
             if user_input.lower() == "checkpoints":
-                if not api.core.checkpoint_manager:
+                if not sanctuary.core.checkpoint_manager:
                     print("❌ Checkpointing is disabled\n")
                     continue
                 
-                checkpoints = api.core.checkpoint_manager.list_checkpoints()
+                checkpoints = sanctuary.core.checkpoint_manager.list_checkpoints()
                 if not checkpoints:
                     print("No checkpoints found.\n")
                 else:
@@ -149,7 +149,7 @@ async def main():
                 continue
             
             if user_input.lower().startswith("load"):
-                if not api.core.checkpoint_manager:
+                if not sanctuary.core.checkpoint_manager:
                     print("❌ Checkpointing is disabled\n")
                     continue
                 
@@ -161,7 +161,7 @@ async def main():
                 checkpoint_id = parts[1]
                 
                 # Find checkpoint by ID prefix
-                checkpoints = api.core.checkpoint_manager.list_checkpoints()
+                checkpoints = sanctuary.core.checkpoint_manager.list_checkpoints()
                 matching = [cp for cp in checkpoints if cp.checkpoint_id.startswith(checkpoint_id)]
                 
                 if not matching:
@@ -177,47 +177,47 @@ async def main():
                 # Cannot load while running - need to stop first
                 print(f"⚠️  Loading checkpoint requires restarting Sanctuary...")
                 print(f"💾 Stopping Sanctuary...")
-                await api.stop()
+                await sanctuary.stop()
                 
                 # Restore state
-                success = api.core.restore_state(checkpoint.path)
+                success = sanctuary.core.restore_state(checkpoint.path)
                 if success:
                     print(f"✅ State restored from {checkpoint.timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
                     print(f"🧠 Restarting Sanctuary...")
-                    await api.start()
+                    await sanctuary.start()
                     print("✅ Sanctuary is online.\n")
                 else:
                     print("❌ Failed to restore state")
                     print("🧠 Restarting Sanctuary with original state...")
-                    await api.start()
+                    await sanctuary.start()
                     print("✅ Sanctuary is online.\n")
                 continue
             
             if user_input.lower() == "restore latest":
-                if not api.core.checkpoint_manager:
+                if not sanctuary.core.checkpoint_manager:
                     print("❌ Checkpointing is disabled\n")
                     continue
                 
-                latest = api.core.checkpoint_manager.get_latest_checkpoint()
+                latest = sanctuary.core.checkpoint_manager.get_latest_checkpoint()
                 if not latest:
                     print("❌ No checkpoints found\n")
                     continue
                 
                 print(f"⚠️  Loading checkpoint requires restarting Sanctuary...")
                 print(f"💾 Stopping Sanctuary...")
-                await api.stop()
+                await sanctuary.stop()
                 
                 # Restore state
-                success = api.core.restore_state(latest)
+                success = sanctuary.core.restore_state(latest)
                 if success:
                     print(f"✅ State restored from latest checkpoint")
                     print(f"🧠 Restarting Sanctuary...")
-                    await api.start()
+                    await sanctuary.start()
                     print("✅ Sanctuary is online.\n")
                 else:
                     print("❌ Failed to restore state")
                     print("🧠 Restarting Sanctuary with original state...")
-                    await api.start()
+                    await sanctuary.start()
                     print("✅ Sanctuary is online.\n")
                 continue
             
@@ -234,7 +234,7 @@ async def main():
                 # memory stats
                 if command == "stats":
                     print("📊 Analyzing memory health...")
-                    health = await api.core.memory.memory_manager.get_memory_health()
+                    health = await sanctuary.core.memory.memory_manager.get_memory_health()
                     
                     print(f"\n🧹 Memory System Health:")
                     print(f"   Total memories: {health.total_memories}")
@@ -275,7 +275,7 @@ async def main():
                     threshold_str = f"threshold={threshold}" if threshold else "default threshold"
                     print(f"🧹 Running garbage collection ({mode_str}, {threshold_str})...")
                     
-                    stats = await api.core.memory.memory_manager.run_gc(
+                    stats = await sanctuary.core.memory.memory_manager.run_gc(
                         threshold=threshold,
                         dry_run=dry_run
                     )
@@ -304,10 +304,10 @@ async def main():
                     action = parts[2]
                     
                     if action == "on":
-                        api.core.memory.memory_manager.enable_auto_gc()
+                        sanctuary.core.memory.memory_manager.enable_auto_gc()
                         print("✅ Automatic garbage collection enabled\n")
                     elif action == "off":
-                        api.core.memory.memory_manager.disable_auto_gc()
+                        sanctuary.core.memory.memory_manager.disable_auto_gc()
                         print("✅ Automatic garbage collection disabled\n")
                     else:
                         print("❌ Usage: memory autogc <on|off>\n")
@@ -320,7 +320,7 @@ async def main():
             
             # Process turn
             print("💭 Thinking...")
-            turn = await api.chat(user_input)
+            turn = await sanctuary.chat(user_input)
             
             # Display response with emotion
             emotion = turn.emotional_state
@@ -331,7 +331,7 @@ async def main():
             else:
                 emotion_label = ""
             
-            print(f"\nSystem {emotion_label}: {turn.system_response}")
+            print(f"\nSanctuary {emotion_label}: {turn.system_response}")
             print(f"(Response time: {turn.response_time:.2f}s)\n")
     
     except Exception as e:
@@ -341,7 +341,7 @@ async def main():
     
     finally:
         print("\n🛑 Shutting down Sanctuary...")
-        await api.stop()
+        await sanctuary.stop()
         print("👋 Sanctuary offline.")
 
 

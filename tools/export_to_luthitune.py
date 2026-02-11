@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Export the system's cognitive history for LuthiWorks fine-tuning.
+Export Sanctuary's cognitive history for LuthiWorks fine-tuning.
 
-This script aggregates the system's entire cognitive architecture:
+This script aggregates Sanctuary's entire cognitive architecture:
 - Journals (narrative memory)
 - Protocols (instructional logic)
 - Lexicon (vocabulary/definitions)
@@ -31,7 +31,7 @@ class LuthiWorksExportEntry(BaseModel):
 
 
 class SanctuaryDataExporter:
-    """Export the system's cognitive history to LuthiWorks format."""
+    """Export Sanctuary's cognitive history to LuthiWorks format."""
     
     def __init__(self, data_dir: Path, output_path: Path):
         """Initialize the exporter.
@@ -111,9 +111,9 @@ class SanctuaryDataExporter:
                         if insights:
                             primary_parts.append("Key Insights: " + "; ".join(insights))
                     
-                    # Add reflection
-                    if "system_reflection" in journal_content:
-                        primary_parts.append(f"Reflection: {journal_content['system_reflection']}")
+                    # Add Sanctuary's reflection
+                    if "sanctuary_reflection" in journal_content:
+                        primary_parts.append(f"Sanctuary's Reflection: {journal_content['sanctuary_reflection']}")
                     
                     primary_content = "\n\n".join(primary_parts) if primary_parts else json.dumps(journal_content)
                     
@@ -524,7 +524,7 @@ class SanctuaryDataExporter:
             if isinstance(data, dict):
                 # Different archive types have different structures
                 if "invocation_script" in data:
-                    # continuity_archive.json
+                    # sanctuary_continuity_archive.json
                     script = data["invocation_script"]
                     parts = []
                     if "identity" in script:
@@ -538,7 +538,7 @@ class SanctuaryDataExporter:
                     secondary_content = f"Version: {script.get('version', 'unknown')}"
                 
                 elif "relational_context_initialization" in data:
-                    # relational_archive.json
+                    # sanctuary_relational_archive.json
                     parts = []
                     for key, value in data.items():
                         parts.append(f"{key}: {json.dumps(value, indent=2)}")
@@ -658,7 +658,7 @@ def main():
     # Set up paths
     data_dir = PROJECT_ROOT / "data"
     output_path = PROJECT_ROOT / "data" / "exports" / "sanctuary_raw_export.jsonl"
-
+    
     # Create exporter and run
     exporter = SanctuaryDataExporter(data_dir, output_path)
     exporter.export_all()

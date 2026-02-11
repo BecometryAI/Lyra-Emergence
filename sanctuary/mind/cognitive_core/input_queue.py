@@ -12,7 +12,7 @@ Key Features:
 - Support for multiple input sources
 - Thread-safe operations
 
-Author: Sanctuary Team
+Author: Sanctuary Emergence Team
 Phase: Communication Agency (Task #1)
 """
 

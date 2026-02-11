@@ -1,5 +1,5 @@
 """
-Discord client for the sanctuary system with voice capabilities
+Discord client for Sanctuary with voice capabilities
 """
 import asyncio
 import logging
@@ -138,7 +138,7 @@ class SanctuaryClient(discord.Client):
         
     async def set_availability(self, state: str, reason: Optional[str] = None):
         """
-        Set the system's availability state and update Discord status accordingly
+        Set Sanctuary's availability state and update Discord status accordingly
 
         Args:
             state: One of 'open', 'limited', 'processing', 'resting'
@@ -176,7 +176,7 @@ class SanctuaryClient(discord.Client):
         
     async def set_status(self, status_type: str, message: Optional[str] = None):
         """
-        Set the system's Discord status and optional activity message
+        Set Sanctuary's Discord status and optional activity message
 
         Args:
             status_type: One of 'online', 'idle', 'dnd' (do not disturb), 'offline'
@@ -237,7 +237,7 @@ class SanctuaryClient(discord.Client):
             await channel.send(f"I heard: {text}")
             
             # Generate response
-            response_text = f"You said: {text}"  # Replace with system response generation
+            response_text = f"You said: {text}"  # Replace with Sanctuary's response generation
             response_file = Path("response.wav")
             
             # Generate speech

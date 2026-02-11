@@ -1,5 +1,5 @@
 """
-Tools for voice interaction in the sanctuary specialist system
+Tools for voice interaction in Sanctuary's specialist system
 """
 import logging
 from typing import Optional, Dict, Any
@@ -17,9 +17,9 @@ class VoiceToolkit:
     def __init__(self, voice_path: Optional[str] = None):
         """
         Initialize voice toolkit
-
+        
         Args:
-            voice_path: Path to the system's voice file
+            voice_path: Path to Sanctuary's voice file
         """
         self.voice_processor = VoiceProcessor(voice_path)
         self.discord_client = SanctuaryDiscordClient(self.voice_processor)

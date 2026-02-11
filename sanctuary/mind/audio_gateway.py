@@ -2,13 +2,13 @@
 Audio Gateway Orchestration
 
 Coordinates ASR server and microphone client for seamless integration.
-Provides high-level interface for the system's auditory perception.
+Provides high-level interface for Sanctuary's auditory perception.
 
 Features:
 - Unified audio processing interface
 - Automatic server/client lifecycle management
 - Error handling and reconnection
-- Integration with the cognitive pipeline
+- Integration with Sanctuary's cognitive pipeline
 """
 
 import asyncio
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class AudioGateway:
-    """High-level audio gateway for the system's hearing"""
+    """High-level audio gateway for Sanctuary's hearing system"""
     
     def __init__(
         self,

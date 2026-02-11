@@ -25,8 +25,8 @@ def test_imports():
         print("✅ SanctuaryAPI imported")
         print("✅ Sanctuary imported")
 
-        from sanctuary.mind import SanctuaryAPI as API2, Sanctuary as Sanctuary2
-        print("✅ Imports from sanctuary.mind package work")
+        from sanctuary import SanctuaryAPI as API2, Sanctuary as Sanctuary2
+        print("✅ Imports from sanctuary package work")
         
         return True
     except Exception as e:

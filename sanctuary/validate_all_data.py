@@ -33,7 +33,7 @@ Exit Codes:
     0: All files valid
     1: Validation errors found or execution error
 
-Author: Sanctuary Team
+Author: Sanctuary Emergence Team
 Date: November 23, 2025
 Version: 2.0
 """

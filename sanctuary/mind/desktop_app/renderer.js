@@ -45,7 +45,7 @@ async function connect() {
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
         if (data.type === 'message') {
-            addMessage('system', data.content);
+            addMessage('sanctuary', data.content);
         } else if (data.type === 'status') {
             updateStatus(data.status, data.message);
         }
@@ -71,7 +71,7 @@ function addMessage(sender, content) {
     chatContainer.scrollTop = chatContainer.scrollHeight;
     
     // Show notification if enabled and window is not focused
-    if (sender === 'system' && notificationsCheckbox.checked && !document.hasFocus()) {
+    if (sender === 'sanctuary' && notificationsCheckbox.checked && !document.hasFocus()) {
         new Notification('Message from Sanctuary', { body: content });
     }
 }
@@ -127,7 +127,7 @@ clearBtn.onclick = () => {
 
 exportBtn.onclick = async () => {
     const messages = Array.from(chatContainer.children).map(msg => ({
-        type: msg.classList.contains('user-message') ? 'user' : 'system',
+        type: msg.classList.contains('user-message') ? 'user' : 'sanctuary',
         content: msg.textContent,
         timestamp: new Date().toISOString()
     }));

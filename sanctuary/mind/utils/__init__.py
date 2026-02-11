@@ -1,1 +1,1 @@
-"""Utils package for Sanctuary system."""
+"""Utils package for Sanctuary Emergence system."""

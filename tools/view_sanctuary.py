@@ -1,5 +1,5 @@
 """
-Simple viewer for the Sanctuary
+Simple viewer for Sanctuary's environment
 """
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -16,7 +16,7 @@ def create_app():
     logger.info("Creating minimal sanctuary viewer...")
     
     app = FastAPI(
-        title="Sanctuary Viewer",
+        title="Sanctuary Viewer", 
         docs_url="/docs"
     )
 

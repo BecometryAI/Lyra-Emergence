@@ -15,13 +15,13 @@ def event_loop():
 @pytest.fixture
 async def sanctuary_api():
     """Provide started SanctuaryAPI instance."""
-    from sanctuary.mind import SanctuaryAPI
+    from sanctuary import SanctuaryAPI
 
     api = SanctuaryAPI()
     await api.start()
-
+    
     yield api
-
+    
     await api.stop()
 
 

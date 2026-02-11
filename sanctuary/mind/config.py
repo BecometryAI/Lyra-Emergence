@@ -1,5 +1,5 @@
 """
-Configuration management for the cognitive system
+Configuration management for Sanctuary's cognitive system
 """
 from pathlib import Path
 import json

@@ -12,9 +12,9 @@ import os
 class SanctuaryLibrarian:
     def __init__(self, base_dir: str, persist_dir: str):
         """Initialize the Sanctuary Librarian with paths and configurations.
-
+        
         Args:
-            base_dir: Root directory containing all sanctuary files
+            base_dir: Root directory containing all Sanctuary's files
             persist_dir: Directory where ChromaDB will persist the vector store
         """
         self.base_dir = base_dir

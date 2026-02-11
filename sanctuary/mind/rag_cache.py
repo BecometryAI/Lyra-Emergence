@@ -1,5 +1,5 @@
 """
-Caching system for the RAG context
+Caching system for Sanctuary's RAG context
 """
 from typing import Dict, Any, Optional, List
 import time

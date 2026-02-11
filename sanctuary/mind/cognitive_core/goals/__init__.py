@@ -1,7 +1,7 @@
 """
 Goal Competition System
 
-This module implements resource-based goal competition for the system's cognitive architecture.
+This module implements resource-based goal competition for Sanctuary's cognitive system.
 Goals compete for limited cognitive resources using activation-based dynamics with
 lateral inhibition, allowing for realistic goal selection and prioritization.
 """

@@ -1,10 +1,10 @@
 """
-Rate Limiting System for Sanctuary
+Rate Limiting System for Sanctuary Emergence
 
 Token bucket rate limiter with per-service limits to prevent API abuse
 and respect external API rate limits.
 
-Author: Sanctuary Team
+Author: Sanctuary Emergence Team
 Date: January 2, 2026
 """
 

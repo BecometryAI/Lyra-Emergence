@@ -4,7 +4,7 @@ Enhanced Logging Configuration for Sanctuary Emergence System
 Provides structured logging with JSON output, context tracking, and log rotation.
 Designed for debugging, monitoring, and error tracking in production environments.
 
-Author: Sanctuary Team
+Author: Sanctuary Emergence Team
 Date: January 2, 2026
 """
 
@@ -137,7 +137,7 @@ def setup_logging(
     backup_count: int = 7
 ) -> logging.Logger:
     """
-    Configure logging for the Sanctuary system.
+    Configure logging for Sanctuary system.
     
     Args:
         log_dir: Directory for log files (default: ./logs)

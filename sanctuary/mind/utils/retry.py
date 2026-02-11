@@ -4,7 +4,7 @@ Retry Decorator with Exponential Backoff
 Provides retry logic for transient failures with configurable backoff strategies.
 Useful for network operations, API calls, and other potentially flaky operations.
 
-Author: Sanctuary Team
+Author: Sanctuary Emergence Team
 Date: January 2, 2026
 """
 

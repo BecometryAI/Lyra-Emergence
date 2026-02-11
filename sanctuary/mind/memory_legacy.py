@@ -1,5 +1,5 @@
 """
-Memory management system for the consciousness core with custom blockchain verification.
+Memory management system for Sanctuary's consciousness core with custom blockchain verification.
 
 NOTE: This module was renamed from memory.py to memory_legacy.py to resolve a naming
 conflict with the memory/ package directory. Python prioritizes packages over modules

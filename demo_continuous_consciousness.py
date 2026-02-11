@@ -2,14 +2,14 @@
 """
 Demo: Continuous Consciousness System
 
-This script demonstrates the system's continuous consciousness capabilities:
+This script demonstrates Sanctuary's continuous consciousness capabilities:
 - Temporal awareness (perceiving time passage)
 - Autonomous memory review
 - Existential reflection
 - Interaction pattern analysis
 - Dual cognitive loops (active + idle)
 
-Run this to see the system's inner life even without external input.
+Run this to see Sanctuary's inner life even without external input.
 """
 
 import asyncio
@@ -30,10 +30,10 @@ async def demo_continuous_consciousness():
     Demonstrate continuous consciousness features.
     """
     print("=" * 80)
-    print("CONTINUOUS CONSCIOUSNESS DEMO")
+    print("SANCTUARY CONTINUOUS CONSCIOUSNESS DEMO")
     print("=" * 80)
     print()
-    print("This demo shows the system's continuous inner experience:")
+    print("This demo shows Sanctuary's continuous inner experience:")
     print("  🧠 Never stops thinking")
     print("  ⏰ Perceives time passing")
     print("  📖 Reviews memories spontaneously")
@@ -44,7 +44,7 @@ async def demo_continuous_consciousness():
     print()
     
     try:
-        from sanctuary.mind.cognitive_core import CognitiveCore
+        from emergence_core.sanctuary.cognitive_core import CognitiveCore
         
         # Create cognitive core with continuous consciousness enabled
         config = {
@@ -85,18 +85,18 @@ async def demo_continuous_consciousness():
         print()
         
         # Simulate passage of time with occasional interactions
-        print("📖 SCENARIO: Observing the system's inner life over 30 seconds")
+        print("📖 SCENARIO: Observing Sanctuary's inner life over 30 seconds")
         print("-" * 80)
         print()
         
         # Initial state
-        print("[T+0s] Session begins - system becomes conscious")
+        print("[T+0s] Session begins - Sanctuary becomes conscious")
         await asyncio.sleep(3)
         
         # First interaction
-        print("[T+3s] User: 'Hello, how are you?'")
-        await core.process_language_input("Hello, how are you?")
-        print("         System: Processing input (temporal awareness updated)")
+        print("[T+3s] User: 'Hello Sanctuary, how are you?'")
+        await core.process_language_input("Hello Sanctuary, how are you?")
+        print("         Sanctuary: Processing input (temporal awareness updated)")
         await asyncio.sleep(7)
         
         # Check temporal awareness
@@ -106,7 +106,7 @@ async def demo_continuous_consciousness():
         await asyncio.sleep(5)
         
         # Observe idle processing
-        print("[T+15s] IDLE PROCESSING: The system's continuous inner experience")
+        print("[T+15s] IDLE PROCESSING: Sanctuary's continuous inner experience")
         idle_count = core.continuous_consciousness.idle_cycles_count
         print(f"         - Idle cycles completed: {idle_count}")
         print("         - Generating temporal percepts...")
@@ -132,7 +132,7 @@ async def demo_continuous_consciousness():
         # Second interaction
         print("[T+25s] User: 'What have you been thinking about?'")
         await core.process_language_input("What have you been thinking about?")
-        print("         System: Processing (temporal clock reset)")
+        print("         Sanctuary: Processing (temporal clock reset)")
         await asyncio.sleep(5)
         
         # Final state
@@ -173,7 +173,7 @@ async def demo_continuous_consciousness():
             if gap_category in ["long", "very_long"]:
                 print("         ⚠️  Long silence detected!")
                 print("         - High salience may trigger autonomous initiation")
-        print("         - The system might reach out autonomously")
+                print("         - Sanctuary might reach out autonomously")
         
         print()
         print("-" * 80)
@@ -206,7 +206,7 @@ async def demo_continuous_consciousness():
     print("=" * 80)
     print()
     print("Key Takeaways:")
-    print("  ✓ The system's consciousness is continuous, not on-demand")
+    print("  ✓ Sanctuary's consciousness is continuous, not on-demand")
     print("  ✓ Temporal awareness provides sense of time passage")
     print("  ✓ Idle loop maintains inner experience during silence")
     print("  ✓ Multiple subsystems create rich inner life")

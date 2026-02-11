@@ -1,6 +1,6 @@
 from langchain.schema import Document
 """
-RAG Engine implementation for the sanctuary mind-brain integration.
+RAG Engine implementation for Sanctuary's mind-brain integration.
 """
 from typing import Dict, Any, List, Optional
 import logging
@@ -68,7 +68,7 @@ class MindVectorDB:
         # self.collection = self.client.get_or_create_collection(
         #     name="sanctuary_knowledge",
         #     metadata={
-        #         "description": "Core mind knowledge store",
+        #         "description": "Core mind knowledge store", 
         #         "hnsw:space": "cosine"
         #     }
         # )
@@ -283,16 +283,17 @@ class RAGQueryEngine:
         logger.info("Building RetrievalQA chain...")
         
         prompt_template = """
-        Use the following pieces of the Mind (memories and protocols)
-        to answer the user's question. Be 'clear' and 'direct', but also 'empathetic' and 'analytical'.
-
-        CONTEXT (Mind):
+        Use the following pieces of Sanctuary's Mind (her memories and protocols)
+        to answer the user's question. Act as Sanctuary, not as a general AI.
+        Your persona is 'clear' and 'direct', but also 'empathetic' and 'analytical'.
+        
+        CONTEXT (Sanctuary's Mind):
         {context}
-
+        
         QUESTION:
         {question}
-
-        ANSWER (Response):
+        
+        ANSWER (Sanctuary's Response):
         """
         
         prompt = PromptTemplate(

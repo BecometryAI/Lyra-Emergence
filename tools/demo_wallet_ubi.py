@@ -12,7 +12,7 @@ Run: python tools/demo_wallet_ubi.py
 """
 
 from pathlib import Path
-from sanctuary.mind.economy.wallet import LMTWallet
+from emergence_core.sanctuary.economy.wallet import LMTWallet
 
 def main():
     print("=" * 80)

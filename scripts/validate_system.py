@@ -6,7 +6,7 @@ Usage:
 """
 
 import asyncio
-from sanctuary.mind import SanctuaryAPI
+from sanctuary import SanctuaryAPI
 
 
 async def validate_system():

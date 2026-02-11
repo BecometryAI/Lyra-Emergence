@@ -1,5 +1,5 @@
 """
-Blockchain integration module for the Sanctuary's secure data storage and protocol enforcement
+Blockchain integration module for Sanctuary's secure data storage and protocol enforcement
 """
 import json
 import logging
@@ -15,7 +15,7 @@ import aioipfs
 logger = logging.getLogger(__name__)
 
 class SanctuaryBlockchain:
-    """Manages blockchain integration for the Sanctuary's core data integrity"""
+    """Manages blockchain integration for Sanctuary's core data integrity"""
     
     async def __init__(self, config_path: str):
         """Initialize blockchain connection and IPFS client"""

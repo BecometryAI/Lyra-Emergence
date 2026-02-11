@@ -1,5 +1,5 @@
 """
-Voice customization module for the system's speech synthesis
+Voice customization module for Sanctuary's speech synthesis
 """
 import torch
 import torchaudio

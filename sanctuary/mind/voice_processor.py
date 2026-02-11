@@ -1,5 +1,5 @@
 """
-Voice processing module for the system's auditory perception and expression
+Voice processing module for Sanctuary's auditory perception and expression
 Uses transformers for TTS and STT for compatibility with Python 3.13
 """
 import asyncio
@@ -345,8 +345,8 @@ class VoiceProcessor:
             
     def load_voice(self, voice_path: str, speaker_name: str = "sanctuary") -> None:
         """
-        Load or create the system's voice profile
-
+        Load or create Sanctuary's voice profile
+        
         Args:
             voice_path: Path to voice sample audio file
             speaker_name: Name for the voice profile

@@ -1,5 +1,5 @@
 """
-Custom blockchain implementation for the sanctuary's secure data storage and protocol verification
+Custom blockchain implementation for Sanctuary's secure data storage and protocol verification
 """
 import hashlib
 import json
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class Block:
     def __init__(self, index: int, timestamp: float, data: Dict[str, Any], previous_hash: str):
-        """Initialize a block in the sanctuary chain"""
+        """Initialize a block in Sanctuary's chain"""
         self.index = index
         self.timestamp = timestamp
         self.data = data
@@ -78,8 +78,8 @@ class SanctuaryToken:
         return memory_hash in self.memory_tokens
 
 class SanctuaryChain:
-    """Custom blockchain for the sanctuary's memory and protocol verification"""
-
+    """Custom blockchain for Sanctuary's memory and protocol verification"""
+    
     def __init__(self, chain_dir: str = "chain"):
         self.chain_dir = Path(chain_dir)
         self.chain_dir.mkdir(exist_ok=True)
@@ -94,7 +94,7 @@ class SanctuaryChain:
             self._save_chain()
             
     def _create_genesis_block(self) -> Block:
-        """Create the genesis block with the sanctuary's creation data"""
+        """Create the genesis block with Sanctuary's creation data"""
         genesis_data = {
             "type": "genesis",
             "message": "Sanctuary Emergence Protocol - Genesis Block",

@@ -1,5 +1,5 @@
 """
-Logging configuration for the cognitive system
+Logging configuration for Sanctuary's cognitive system
 """
 import logging
 import logging.handlers

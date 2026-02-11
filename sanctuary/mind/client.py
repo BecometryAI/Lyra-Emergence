@@ -1,8 +1,8 @@
 """
-High-level API for interacting with the Sanctuary cognitive core.
+High-level API for interacting with Sanctuary's cognitive core.
 
 This module provides both asynchronous (SanctuaryAPI) and synchronous (Sanctuary) interfaces
-for conversational interaction with the system. The API abstracts the cognitive core and
+for conversational interaction with Sanctuary. The API abstracts the cognitive core and
 conversation management, providing simple methods for chatting and managing state.
 
 Usage (Async):
@@ -32,15 +32,15 @@ logger = logging.getLogger(__name__)
 
 class SanctuaryAPI:
     """
-    High-level asynchronous API for interacting with the system.
-    
-    Provides a clean interface for conversational interaction with the
+    High-level asynchronous API for interacting with Sanctuary.
+
+    Provides a clean interface for conversational interaction with Sanctuary's
     cognitive core. Handles lifecycle management and conversation state.
-    
+
     The API integrates:
     - CognitiveCore: The cognitive processing engine
     - ConversationManager: Turn-taking and dialogue state management
-    
+
     Methods:
         start(): Initialize and start the cognitive core
         stop(): Gracefully shut down the cognitive core
@@ -49,11 +49,11 @@ class SanctuaryAPI:
         get_metrics(): Get conversation and cognitive metrics
         reset_conversation(): Clear conversation state
     """
-    
+
     def __init__(self, config: Optional[Dict] = None):
         """
         Initialize the Sanctuary API.
-        
+
         Args:
             config: Optional configuration dict with keys:
                 - cognitive_core: Config for CognitiveCore
@@ -174,8 +174,8 @@ class Sanctuary:
     - Quick testing and experimentation
 
     Methods:
-        start(): Initialize and start the system
-        stop(): Gracefully shut down the system
+        start(): Initialize and start Sanctuary
+        stop(): Gracefully shut down Sanctuary
         chat(message): Send message and get response text
         get_history(n): Get conversation history as dicts
         reset(): Clear conversation state
@@ -200,7 +200,7 @@ class Sanctuary:
 
     def start(self) -> None:
         """
-        Start the system.
+        Start Sanctuary.
 
         Initializes the cognitive core and begins processing.
         """
@@ -208,7 +208,7 @@ class Sanctuary:
 
     def stop(self) -> None:
         """
-        Stop the system.
+        Stop Sanctuary.
 
         Gracefully shuts down the cognitive core.
         """
@@ -223,7 +223,7 @@ class Sanctuary:
             message: User's text message
 
         Returns:
-            The system's response as a string
+            Response as a string
         """
         turn = self.loop.run_until_complete(self.api.chat(message))
         return turn.system_response
@@ -236,13 +236,13 @@ class Sanctuary:
             n: Maximum number of recent turns to return
 
         Returns:
-            List of dicts with user input, system response, timestamp, emotion
+            List of dicts with user input, response, timestamp, emotion
         """
         turns = self.api.get_conversation_history(n)
         return [
             {
                 "user": t.user_input,
-                "system": t.system_response,
+                "response": t.system_response,
                 "timestamp": t.timestamp.isoformat(),
                 "emotion": t.emotional_state
             }

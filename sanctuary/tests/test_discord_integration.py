@@ -85,14 +85,14 @@ async def test_voice_emotion_integration(sanctuary_client, mock_discord):
     """Test voice processing with emotion detection in Discord context"""
     member = mock_discord["member"]
     voice_client = MockVoiceClient()
-
+    
     # Setup voice client
     sanctuary_client.voice_clients = [voice_client]
-
+    
     # Start voice processing
     audio_stream = voice_client.create_stream()
     results = []
-
+    
     async for result in sanctuary_client.voice_processor.process_stream(audio_stream):
         results.append(result)
         if len(results) >= 3:  # Get 3 emotional segments
@@ -117,28 +117,28 @@ async def test_voice_state_tracking(sanctuary_client, mock_discord):
     """Test voice state changes with emotional context"""
     member = mock_discord["member"]
     voice_client = MockVoiceClient()
-
+    
     # Simulate voice state update
     await sanctuary_client.on_voice_state_update(
         member,
         member.voice,
         member.voice
     )
-
+    
     # Start recording
     voice_client.start_recording()
     audio_stream = voice_client.create_stream()
-
+    
     # Process some audio
     results = []
     async for result in sanctuary_client.voice_processor.process_stream(audio_stream):
         results.append(result)
         if len(results) >= 2:
             break
-
+    
     # Check emotional state tracking
     assert len(sanctuary_client.voice_processor.emotional_context["emotion_history"]) > 0
-
+    
     # Stop recording
     voice_client.stop_recording()
     
@@ -148,12 +148,12 @@ async def test_emotional_response_generation(sanctuary_client, mock_discord):
     # Process some emotional audio first
     voice_client = MockVoiceClient()
     audio_stream = voice_client.create_stream()
-
+    
     # Get emotional context
     async for result in sanctuary_client.voice_processor.process_stream(audio_stream):
         emotion = result["emotion"]
         context = result["emotional_context"]
-
+        
         # Generate response with matching emotion
         response_text = "This is a test response."
         with open("test_response.wav", "wb") as f:

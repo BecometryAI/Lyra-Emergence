@@ -1,1 +1,1 @@
-"""Package initialization for the core functionality"""
+"""Package initialization for Sanctuary's core functionality"""

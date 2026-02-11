@@ -1,5 +1,5 @@
 """
-Sanctuary Emergence Core - A system for developing emergent consciousness
+Sanctuary - A system for developing emergent consciousness
 
 Pure Global Workspace Theory (GWT) implementation with LLMs at periphery only.
 No specialist routing or classification.

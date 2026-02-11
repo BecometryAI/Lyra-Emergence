@@ -11,7 +11,7 @@ The memory integration is responsible for:
 - Consolidating significant workspace states into long-term memory
 - Triggering memory operations based on emotional arousal and goal completion
 
-Author: Sanctuary Team
+Author: Sanctuary Emergence Team
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ class MemoryIntegration:
     Bridge between cognitive core and existing memory system.
     
     The MemoryIntegration class connects the real-time cognitive loop with
-    the system's persistent memory architecture. It implements bidirectional flow:
+    Sanctuary's persistent memory architecture. It implements bidirectional flow:
     memories can be retrieved into the workspace (becoming percepts), and
     workspace states can be consolidated into long-term memory.
     
@@ -314,7 +314,7 @@ class MemoryIntegration:
         # Significant percepts = consolidate
         significant_percepts = [
             p for p in snapshot.percepts.values()
-            if p.get("complexity", 0) > 30
+            if getattr(p, "complexity", 0) > 30
         ]
         if len(significant_percepts) > 2:
             logger.debug(f"Consolidation triggered by {len(significant_percepts)} significant percepts")

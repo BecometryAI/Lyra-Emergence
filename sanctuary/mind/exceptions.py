@@ -1,5 +1,5 @@
 """
-Exception Hierarchy for Sanctuary Emergence System
+Exception Hierarchy for Sanctuary System
 
 Structured exception classes for all subsystems to enable proper error handling,
 recovery, and debugging throughout the system.
@@ -17,7 +17,7 @@ class SanctuaryBaseException(Exception):
 
     All Sanctuary-specific exceptions should inherit from this class to enable
     systematic error handling and recovery strategies.
-
+    
     Attributes:
         message: Human-readable error description
         context: Additional context about the error (dict)
