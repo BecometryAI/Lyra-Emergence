@@ -537,12 +537,12 @@ class OllamaClient(LLMClient):
 
     Requires:
         - Ollama installed and running (https://ollama.com)
-        - A model pulled: e.g. `ollama pull gemma2:12b`
+        - A model pulled: e.g. `ollama pull gemma3:12b`
 
     Config example:
         {
             "backend": "ollama",
-            "model_name": "gemma2:12b",
+            "model_name": "gemma3:12b",
             "base_url": "http://localhost:11434",
             "temperature": 0.7,
             "max_tokens": 500,

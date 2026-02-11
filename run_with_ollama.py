@@ -14,10 +14,10 @@ Prerequisites:
        ollama serve
 
     3. Pull a model:
-       ollama pull gemma2:12b
+       ollama pull gemma3:12b
 
 Usage:
-    python run_with_ollama.py                    # uses gemma2:12b by default
+    python run_with_ollama.py                    # uses gemma3:12b by default
     python run_with_ollama.py --model llama3.2   # use a different model
     python run_with_ollama.py --mock-perception   # skip sentence-transformers
 
@@ -45,13 +45,13 @@ def parse_args():
 Examples:
   python run_with_ollama.py
   python run_with_ollama.py --model llama3.2
-  python run_with_ollama.py --model gemma2:12b --ollama-url http://localhost:11434
+  python run_with_ollama.py --model gemma3:12b --ollama-url http://localhost:11434
   python run_with_ollama.py --mock-perception  (skip sentence-transformers requirement)
         """
     )
     parser.add_argument(
-        "--model", default="gemma2:12b",
-        help="Ollama model name (default: gemma2:12b)"
+        "--model", default="gemma3:12b",
+        help="Ollama model name (default: gemma3:12b)"
     )
     parser.add_argument(
         "--ollama-url", default="http://localhost:11434",
