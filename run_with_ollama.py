@@ -117,6 +117,17 @@ def build_config(args):
                 "timeout": args.timeout,
             },
 
+            # Language interface timeouts — must be long enough for local LLMs
+            "language_input": {
+                "timeout": args.timeout,
+                "max_retries": 2,
+                "use_fallback_on_error": True,
+            },
+            "language_output": {
+                "timeout": args.timeout,
+                "use_fallback_on_error": True,
+            },
+
             # Checkpointing
             "checkpointing": {
                 "enabled": True,
