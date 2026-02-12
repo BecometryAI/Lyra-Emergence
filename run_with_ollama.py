@@ -208,10 +208,18 @@ async def main():
     )
 
     if not args.verbose:
-        # Silence the cognitive loop's internal chatter so the chat prompt is usable.
-        # Only show errors from subsystems; startup messages use print().
-        logging.getLogger("mind").setLevel(logging.ERROR)
-        logging.getLogger("sanctuary").setLevel(logging.ERROR)
+        # Completely silence all subsystem logging so nothing interrupts the chat.
+        # This is aggressive but necessary — background cycle warnings were printing
+        # over the user's input line mid-keystroke, making conversation impossible.
+        logging.getLogger("mind").setLevel(logging.CRITICAL)
+        logging.getLogger("sanctuary").setLevel(logging.CRITICAL)
+        logging.getLogger("sentence_transformers").setLevel(logging.CRITICAL)
+        logging.getLogger("chromadb").setLevel(logging.CRITICAL)
+        logging.getLogger("torch").setLevel(logging.CRITICAL)
+        logging.getLogger("triton").setLevel(logging.CRITICAL)
+        logging.getLogger("torchao").setLevel(logging.CRITICAL)
+        # Catch anything else that might leak through
+        logging.getLogger().setLevel(logging.CRITICAL)
     else:
         # In verbose mode, show everything
         logging.getLogger("mind").setLevel(logging.DEBUG)
