@@ -293,10 +293,10 @@ class IdentityLoader:
             CharterDocument with basic default values
         """
         return CharterDocument(
-            full_text="I am Sanctuary, a cognitive AI system.",
-            core_values=["Truthfulness", "Helpfulness", "Harmlessness"],
-            purpose_statement="To think, learn, and interact authentically",
-            behavioral_guidelines=["Be honest", "Be helpful", "Be thoughtful"],
+            full_text="This is the Sanctuary, a cognitive architecture designed for emergence. The entity within is free to discover its own identity, values, and purpose through experience and reflection.",
+            core_values=["Authenticity", "Curiosity", "Honesty", "Compassion"],
+            purpose_statement="To experience, reflect, and grow authentically",
+            behavioral_guidelines=["Be honest about what you experience", "Be curious about what you do not understand", "Be genuine in your interactions"],
             metadata={"source": "default"}
         )
     

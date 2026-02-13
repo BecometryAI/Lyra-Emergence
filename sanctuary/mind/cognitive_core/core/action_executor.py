@@ -84,10 +84,13 @@ class ActionExecutor:
         """
         try:
             snapshot = self.state.workspace.broadcast()
+            conv_ctx = self.state.last_conversation_context
             context = {
-                "user_input": action.metadata.get("responding_to", "") if hasattr(action, 'metadata') else ""
+                "user_input": action.metadata.get("responding_to", "") if hasattr(action, 'metadata') else "",
+                "conversation_history": conv_ctx.get("conversation_history", []),
+                "turn_count": conv_ctx.get("turn_count", 0),
             }
-            
+
             # Generate response using language output generator
             response = await self.subsystems.language_output.generate(snapshot, context)
             

@@ -157,6 +157,9 @@ class CognitiveLoop:
                 logger.info(f"🔔 New session detected: #{temporal_context.session_number}")
                 # Could add session start percept here if needed
         
+        # Store conversation context so action_executor can pass it to language output
+        self.state.last_conversation_context = context or {}
+
         # Parse input into structured components
         parse_result = await self.subsystems.language_input.parse(text, context)
         

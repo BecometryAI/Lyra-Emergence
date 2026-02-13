@@ -97,15 +97,10 @@ def build_config(args):
                 "mock_embedding_dim": 384,
             },
 
-            # LLM — both input and output go through Ollama
+            # Input parsing uses fast rule-based parser (no LLM needed).
+            # Output generation uses Ollama for real language.
             "input_llm": {
-                "use_real_model": True,
-                "backend": "ollama",
-                "model_name": input_model,
-                "base_url": args.ollama_url,
-                "temperature": 0.3,
-                "max_tokens": 512,
-                "timeout": args.timeout,
+                "use_real_model": False,
             },
             "output_llm": {
                 "use_real_model": True,
@@ -134,7 +129,14 @@ def build_config(args):
                 "auto_save": False,
                 "checkpoint_on_shutdown": False,
             },
-        }
+        },
+
+        # Conversation manager — needs long timeout for local LLM responses
+        "conversation": {
+            "response_timeout": args.timeout,
+            "max_cycles_per_turn": 50,
+            "max_history_size": 100,
+        },
     }
 
     return config

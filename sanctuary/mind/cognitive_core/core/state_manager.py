@@ -53,6 +53,9 @@ class StateManager:
         self.active_task: Optional[asyncio.Task] = None
         self.idle_task: Optional[asyncio.Task] = None
         
+        # Conversation context (updated by process_language_input, read by action_executor)
+        self.last_conversation_context: Dict[str, Any] = {}
+
         # Queues (initialized in start())
         self.input_queue: Optional[asyncio.Queue] = None
         self.output_queue: Optional[asyncio.Queue] = None
