@@ -110,8 +110,7 @@ async def main():
     
     print(f"Active Percepts ({len(snapshot.percepts)}):")
     for i, (percept_id, percept_data) in enumerate(list(snapshot.percepts.items())[:5], 1):  # Show first 5
-        # percept_data is a dict from model_dump(), not a Percept object
-        modality = percept_data.get('modality', 'unknown')
+        modality = getattr(percept_data, 'modality', 'unknown')
         print(f"  {i}. [{modality}] {percept_id[:8]}...")
     if len(snapshot.percepts) > 5:
         print(f"  ... and {len(snapshot.percepts) - 5} more")
@@ -166,7 +165,36 @@ async def main():
     else:
         print("  No performance data available yet")
     print()
-    
+
+    # Display subsystem health report
+    print("=" * 70)
+    print("SUBSYSTEM HEALTH REPORT")
+    print("=" * 70)
+    print()
+
+    health_report = core.get_health_report()
+    print(f"Overall Status: {health_report['overall_status'].upper()}")
+    print(f"Total Subsystems Tracked: {health_report['total_subsystems']}")
+    print(f"  Healthy:  {health_report['healthy_count']}")
+    print(f"  Degraded: {health_report['degraded_count']}")
+    print(f"  Failed:   {health_report['failed_count']}")
+    print()
+
+    if health_report['subsystems']:
+        print("Per-Subsystem Health:")
+        print()
+        for name, info in sorted(health_report['subsystems'].items()):
+            status = info['status'].upper()
+            failures = info['consecutive_failures']
+            rate = info['failure_rate']
+            marker = "✅" if status == "HEALTHY" else ("⚠️" if status == "DEGRADED" else "❌")
+            print(f"  {marker} {name}: {status}")
+            if failures > 0 or rate > 0:
+                print(f"      consecutive_failures={failures}, failure_rate={rate:.1%}")
+            if info.get('last_error'):
+                print(f"      last_error: {info['last_error'][:80]}")
+        print()
+
     # Step 9: Stop the cognitive core
     print("Step 9: Stopping CognitiveCore...")
     await core.stop()
