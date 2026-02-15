@@ -685,3 +685,4 @@ class CycleExecutor:
         except Exception as e:
             # Log but don't fail the cognitive cycle
             logger.warning(f"Failed to update IWMT world model: {e}")
+

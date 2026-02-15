@@ -21,7 +21,8 @@ class TestAttentionSelection:
         attention = AttentionController(
             attention_budget=100,
             workspace=workspace,
-            affect=affect
+            affect=affect,
+            use_competition=False,  # Legacy mode — tests scoring, not GWT dynamics
         )
         
         # Add goal
@@ -61,7 +62,8 @@ class TestAttentionSelection:
         attention = AttentionController(
             attention_budget=100,
             workspace=workspace,
-            affect=affect
+            affect=affect,
+            use_competition=False,
         )
         
         # Add familiar percept to workspace
@@ -102,7 +104,8 @@ class TestAttentionSelection:
         attention = AttentionController(
             attention_budget=100,
             workspace=workspace,
-            affect=affect
+            affect=affect,
+            use_competition=False,
         )
         
         # Create percepts with different emotional salience

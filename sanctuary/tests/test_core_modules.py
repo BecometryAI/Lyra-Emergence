@@ -192,10 +192,11 @@ class TestStateManagerQueues:
         assert sm.output_queue is not None
         assert sm.input_queue.maxsize == 10
 
-    def test_inject_input_before_init_raises(self):
+    def test_inject_input_before_init_auto_initializes(self):
         sm = _make_state_manager()
-        with pytest.raises(RuntimeError, match="queues must be initialized"):
-            sm.inject_input("test", "text")
+        sm.inject_input("test", "text")
+        assert sm.input_queue is not None
+        assert not sm.input_queue.empty()
 
     def test_inject_input_after_init(self):
         sm = _make_state_manager()

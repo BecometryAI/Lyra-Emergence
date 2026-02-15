@@ -144,7 +144,7 @@ class TestBootCycling:
             await core.cycle_executor.execute_cycle()
 
         state = core.query_state()
-        logger.info(f"Workspace after input: {len(state.active_percepts)} percepts")
+        logger.info(f"Workspace after input: {len(state.percepts)} percepts")
         assert state is not None
 
 

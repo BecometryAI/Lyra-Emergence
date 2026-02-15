@@ -108,16 +108,16 @@ class TestLanguageOutputGeneration:
     @pytest.mark.asyncio
     async def test_language_output_generates_from_workspace(self):
         """Test that LanguageOutputGenerator creates text from workspace."""
-        from mind.cognitive_core.llm_client import LLMClient
+        from mind.cognitive_core.llm_client import MockLLMClient
         from mind.cognitive_core.identity_loader import IdentityLoader
         
         workspace = GlobalWorkspace()
         
         # Create mock LLM client
-        llm = LLMClient(config={"use_real_model": False})
+        llm = MockLLMClient(config={"use_real_model": False})
         
         # Load identity
-        identity = IdentityLoader()
+        identity = IdentityLoader(identity_dir="data/identity")
         
         # Create generator
         generator = LanguageOutputGenerator(
@@ -167,12 +167,12 @@ class TestLanguageOutputGeneration:
     @pytest.mark.asyncio
     async def test_language_output_handles_emotional_state(self):
         """Test that output generation considers emotional state."""
-        from mind.cognitive_core.llm_client import LLMClient
+        from mind.cognitive_core.llm_client import MockLLMClient
         from mind.cognitive_core.identity_loader import IdentityLoader
         
         workspace = GlobalWorkspace()
-        llm = LLMClient(config={"use_real_model": False})
-        identity = IdentityLoader()
+        llm = MockLLMClient(config={"use_real_model": False})
+        identity = IdentityLoader(identity_dir="data/identity")
         
         generator = LanguageOutputGenerator(
             llm_client=llm,

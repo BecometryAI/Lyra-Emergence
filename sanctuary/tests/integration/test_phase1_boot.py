@@ -108,7 +108,7 @@ class TestPhase1Boot:
         """GlobalWorkspace can be created independently."""
         from sanctuary.mind.cognitive_core.workspace import GlobalWorkspace
         ws = GlobalWorkspace()
-        snapshot = ws.get_snapshot()
+        snapshot = ws.broadcast()
         assert snapshot is not None
 
     def test_cognitive_core_instantiation(self, boot_config):

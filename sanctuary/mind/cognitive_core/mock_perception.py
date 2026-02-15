@@ -98,6 +98,8 @@ class MockPerceptionSubsystem:
     def get_stats(self) -> Dict[str, Any]:
         total = self.stats["cache_hits"] + self.stats["cache_misses"]
         return {
+            "cache_hits": self.stats["cache_hits"],
+            "cache_misses": self.stats["cache_misses"],
             "cache_hit_rate": self.stats["cache_hits"] / total if total else 0.0,
             "total_encodings": self.stats["total_encodings"],
             "embedding_dim": self.embedding_dim,

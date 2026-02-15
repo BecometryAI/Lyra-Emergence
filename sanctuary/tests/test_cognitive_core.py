@@ -193,15 +193,16 @@ class TestCognitiveCoreInputInjection:
         await core.stop()
 
     @pytest.mark.asyncio
-    async def test_inject_input_requires_start(self, temp_dirs):
-        """Test that injecting input before start raises error"""
+    async def test_inject_input_before_start_auto_initializes(self, temp_dirs):
+        """Test that injecting input before start auto-initializes queues."""
         workspace = GlobalWorkspace()
         config = make_core_config(temp_dirs)
         core = CognitiveCore(workspace=workspace, config=config)
 
-        # Inject input before starting should raise error
-        with pytest.raises(RuntimeError):
-            core.inject_input("test input", modality="text")
+        # Inject input before starting — should auto-initialize queues
+        core.inject_input("test input", modality="text")
+        assert core.state.input_queue is not None
+        assert not core.state.input_queue.empty()
 
 
 class TestCognitiveCoreAttentionIntegration:

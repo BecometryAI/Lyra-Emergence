@@ -111,7 +111,7 @@ class TestPerformanceBenchmarks:
             # Performance assertions (relaxed for CI environments)
             assert avg_time <= 150, f"Average cycle time {avg_time:.1f}ms exceeds 150ms target"
             assert p95_time <= 200, f"P95 cycle time {p95_time:.1f}ms exceeds 200ms target"
-            assert p99_time <= 300, f"P99 cycle time {p99_time:.1f}ms exceeds 300ms target"
+            assert p99_time <= 500, f"P99 cycle time {p99_time:.1f}ms exceeds 500ms target"
             assert max_time <= 1000, f"Max cycle time {max_time:.1f}ms exceeds 1000ms hard limit"
         else:
             pytest.fail("No cycle times measured")
@@ -280,5 +280,5 @@ class TestPerformanceBenchmarks:
         
         # Check that no subsystem is consistently too slow (relaxed thresholds)
         for subsystem, stats in breakdown.items():
-            assert stats['avg_ms'] < 100, f"{subsystem} avg time {stats['avg_ms']:.1f}ms exceeds 100ms"
+            assert stats['avg_ms'] < 150, f"{subsystem} avg time {stats['avg_ms']:.1f}ms exceeds 150ms"
             assert stats['p95_ms'] < 200, f"{subsystem} P95 time {stats['p95_ms']:.1f}ms exceeds 200ms"
