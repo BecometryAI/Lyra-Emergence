@@ -212,15 +212,15 @@ class TestCognitiveFeedbackLoop:
             reason="Test tool execution"
         )
         
-        # Execute the tool action
-        percept = await core._execute_tool_action(action)
-        
+        # Execute the tool action via the action executor
+        percept = await core.action_executor.execute_tool(action)
+
         # Verify percept was created
         assert percept is not None
         assert percept.modality == "tool_result"
         assert percept.metadata.get("tool_name") == "process"
         assert percept.metadata.get("tool_success") is True
-        
+
         # Verify percept contains processed result
         assert "Processed: test" in str(percept.raw)
     
@@ -247,15 +247,11 @@ class TestCognitiveFeedbackLoop:
             }
         )
         
-        core._pending_tool_percepts = [test_percept]
-        
-        # Gather percepts (should include pending tool percepts)
-        percepts = await core._gather_percepts()
-        
-        # Note: _gather_percepts doesn't add pending percepts directly
-        # They are added in _cognitive_cycle, so we verify the attribute exists
-        assert hasattr(core, '_pending_tool_percepts')
-        assert len(core._pending_tool_percepts) == 1
+        core.state.add_pending_tool_percept(test_percept)
+
+        # Verify the pending percept is stored in the state manager
+        assert len(core.state._pending_tool_percepts) == 1
+        assert core.state._pending_tool_percepts[0].modality == "tool_result"
 
 
 @pytest.mark.integration
@@ -339,8 +335,8 @@ class TestEndToEndFeedbackLoop:
             reason="Test feedback loop"
         )
         
-        # Execute and get percept
-        percept = await core._execute_tool_action(action)
+        # Execute and get percept via the action executor
+        percept = await core.action_executor.execute_tool(action)
         
         # Verify feedback loop components
         assert percept is not None

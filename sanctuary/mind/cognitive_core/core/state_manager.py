@@ -80,8 +80,7 @@ class StateManager:
             RuntimeError: If called before queues initialized
         """
         if self.input_queue is None:
-            logger.error("Cannot inject input: queues not initialized")
-            raise RuntimeError("StateManager queues must be initialized before injecting input")
+            self.initialize_queues()
         
         try:
             self.input_queue.put_nowait((raw_input, modality))

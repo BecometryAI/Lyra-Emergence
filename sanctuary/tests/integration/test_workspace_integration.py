@@ -88,7 +88,7 @@ class TestWorkspaceBroadcasting:
         assert snapshot.emotions["valence"] == 0.5
         
         assert len(snapshot.memories) == 1
-        assert snapshot.memories[0]["content"] == "Test memory"
+        assert snapshot.memories[0].content == "Test memory"
     
     def test_snapshot_isolation(self):
         """Test that modifying workspace doesn't affect existing snapshots."""
