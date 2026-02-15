@@ -118,11 +118,12 @@ class TestAttentionBudgetConstraints:
         """Test that attention handles varying complexity appropriately."""
         workspace = GlobalWorkspace()
         affect = AffectSubsystem()
-        
+
         attention = AttentionController(
             attention_budget=20,
             workspace=workspace,
-            affect=affect
+            affect=affect,
+            use_competition=False,
         )
         
         # Create percepts with varying complexity
@@ -143,25 +144,16 @@ class TestAttentionBudgetConstraints:
         assert total_complexity <= 20
     
     def test_attention_with_zero_budget(self):
-        """Test attention behavior with zero budget."""
+        """Test that zero budget raises ValueError at construction."""
         workspace = GlobalWorkspace()
         affect = AffectSubsystem()
-        
-        attention = AttentionController(
-            attention_budget=0,
-            workspace=workspace,
-            affect=affect
-        )
-        
-        percepts = [
-            Percept(modality="text", raw="Test", complexity=5)
-        ]
-        
-        # Should handle gracefully (empty selection)
-        selected = attention.select_for_broadcast(percepts)
-        
-        # With zero budget, nothing can be selected
-        assert len(selected) == 0
+
+        with pytest.raises(ValueError, match="attention_budget must be positive"):
+            AttentionController(
+                attention_budget=0,
+                workspace=workspace,
+                affect=affect,
+            )
 
 
 @pytest.mark.integration
