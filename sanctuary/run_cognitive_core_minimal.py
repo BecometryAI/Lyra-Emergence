@@ -110,8 +110,7 @@ async def main():
     
     print(f"Active Percepts ({len(snapshot.percepts)}):")
     for i, (percept_id, percept_data) in enumerate(list(snapshot.percepts.items())[:5], 1):  # Show first 5
-        # percept_data is a dict from model_dump(), not a Percept object
-        modality = percept_data.get('modality', 'unknown')
+        modality = getattr(percept_data, 'modality', 'unknown')
         print(f"  {i}. [{modality}] {percept_id[:8]}...")
     if len(snapshot.percepts) > 5:
         print(f"  ... and {len(snapshot.percepts) - 5} more")
