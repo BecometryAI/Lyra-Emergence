@@ -376,26 +376,6 @@ class CognitiveCore:
 
 
 __all__ = ['CognitiveCore', 'SubsystemSupervisor', 'SubsystemStatus', 'SubsystemHealthState']
-=======
-"""
-Cognitive Core module.
-
-This module provides a refactored, modular implementation of the cognitive core.
-The original monolithic core.py has been split into focused, single-responsibility modules:
-
-- subsystem_coordinator.py: Initialize and coordinate all subsystems
-- state_manager.py: Workspace state, queues, and metrics
-- lifecycle.py: Start/stop/checkpoint operations
-- timing.py: Rate limiting and performance tracking
-- cycle_executor.py: Execute the 9-step cognitive cycle
-- cognitive_loop.py: Main ~10Hz recurrent loop orchestration
-
-The CognitiveCore class remains the main public interface, but now acts as a thin
-facade that delegates to these specialized modules.
-"""
-
-from __future__ import annotations
-
 import asyncio
 import logging
 from typing import Optional, Dict, Any
