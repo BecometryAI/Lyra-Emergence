@@ -173,9 +173,14 @@ class ProtocolLoader:
         if self.protocols and not force_reload:
             logger.debug("Protocols already loaded, use force_reload=True to reload")
             return self.protocols
-        
+
+        # Cache negative result to avoid repeated filesystem checks and error logs
+        if self.last_load_time is not None and not self.protocols and not force_reload:
+            return {}
+
         if not self.protocol_dir.exists():
             logger.error(f"❌ Protocols directory not found: {self.protocol_dir}")
+            self.last_load_time = datetime.now()
             return {}
         
         self.protocols.clear()

@@ -27,6 +27,9 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
+      - name: Create data directories for CI
+        run: mkdir -p data/Protocols data/identity
+
       - name: Run unit tests
         run: >
           uv run pytest sanctuary/tests/ -q --tb=short
