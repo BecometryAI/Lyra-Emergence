@@ -2,7 +2,7 @@
 
 This document tracks the development trajectory for the Sanctuary cognitive architecture, from proven POC through production-ready system.
 
-**Last Updated**: 2026-02-15
+**Last Updated**: 2026-02-16
 **Current Phase**: Post-POC — Hardening & Feature Expansion
 
 ---
@@ -84,9 +84,9 @@ Add capabilities that deepen the cognitive architecture. Each feature is a self-
 
 | Task | Priority | Status | Description |
 |------|----------|--------|-------------|
-| Implement interruption capability | P2 | Pending | Can speak mid-human-turn if urgent ("Sorry to interrupt, but...") |
-| Add communication reflection | P2 | Pending | Post-hoc evaluation: "Was that the right thing to say?" |
-| Wire proactive initiation to real output | P1 | Pending | ProactiveInitiationSystem exists but needs connection to actual output channels |
+| Wire proactive initiation to real output | P1 | **Done** | `SPEAK_AUTONOMOUS` goal→action wiring + `CommunicationDecisionLoop.evaluate()` called in cycle step 6.7; proactive drives now flow through to `output_queue` |
+| Implement interruption capability | P2 | **Done** | `InterruptionSystem` with 5 trigger types (safety, value_conflict, critical_insight, emotional_urgency, correction); urgency threshold 0.85, 60s cooldown; wired into cycle step 6.6 |
+| Add communication reflection | P2 | **Done** | `CommunicationReflectionSystem` with post-hoc evaluation (timing, content alignment, emotional fit); called after every SPEAK/SPEAK_AUTONOMOUS; EMA quality tracking + lesson extraction |
 
 ### 2.2 Advanced Cognition
 
@@ -266,4 +266,4 @@ Everything below is done and merged. Kept for historical reference.
 
 ---
 
-**Next Action**: Phase 2.1 — New Cognitive Capabilities
+**Next Action**: Phase 2.2 — Advanced Cognition

@@ -112,9 +112,12 @@ class ActionExecutor:
             # Record output in communication drive system
             if hasattr(self.subsystems, 'communication_drives'):
                 self.subsystems.communication_drives.record_output()
+
+            # Post-hoc reflection: "Was that the right thing to say?"
+            self._reflect_on_output(response, "SPEAK", snapshot)
         except Exception as e:
             logger.error(f"Failed to execute SPEAK action: {e}", exc_info=True)
-    
+
     async def execute_speak_autonomous(self, action) -> None:
         """
         Execute SPEAK_AUTONOMOUS action with validation.
@@ -155,6 +158,9 @@ class ActionExecutor:
             # Record output in communication drive system
             if hasattr(self.subsystems, 'communication_drives'):
                 self.subsystems.communication_drives.record_output()
+
+            # Post-hoc reflection: "Was that the right thing to say?"
+            self._reflect_on_output(response, "SPEAK_AUTONOMOUS", snapshot)
         except Exception as e:
             logger.error(f"Failed to execute SPEAK_AUTONOMOUS action: {e}", exc_info=True)
     
@@ -215,6 +221,49 @@ class ActionExecutor:
             logger.error(f"Error executing tool action: {e}", exc_info=True)
             return None
     
+    def _reflect_on_output(self, text: str, output_type: str, snapshot) -> None:
+        """
+        Run post-hoc communication reflection after producing output.
+
+        Evaluates the communication and logs the reflection. Failures here
+        must not disrupt the main action pipeline.
+        """
+        if not hasattr(self.subsystems, 'communication_reflection'):
+            return
+
+        try:
+            emotional_state = self.subsystems.affect.get_state()
+
+            # Gather decision context if available
+            decision_context: Dict[str, Any] = {}
+            if hasattr(self.subsystems, 'communication_decision'):
+                history = self.subsystems.communication_decision.decision_history
+                if history:
+                    last = history[-1]
+                    decision_context = {
+                        "confidence": last.confidence,
+                        "net_pressure": last.net_pressure,
+                        "drive_level": last.drive_level,
+                        "was_autonomous": output_type == "SPEAK_AUTONOMOUS"
+                    }
+
+            reflection = self.subsystems.communication_reflection.reflect(
+                output_text=text,
+                output_type=output_type,
+                workspace_state=snapshot,
+                emotional_state=emotional_state,
+                decision_context=decision_context
+            )
+
+            if reflection.overall_score < 0.4:
+                logger.info(
+                    f"🪞 Reflection: {reflection.verdict.value} "
+                    f"(score={reflection.overall_score:.2f}) — "
+                    f"{'; '.join(reflection.lessons)}"
+                )
+        except Exception as e:
+            logger.debug(f"Communication reflection failed (non-critical): {e}")
+
     @staticmethod
     def extract_outcome(action) -> Dict[str, Any]:
         """

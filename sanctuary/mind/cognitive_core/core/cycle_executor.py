@@ -328,6 +328,34 @@ class CycleExecutor:
         else:
             subsystem_timings['communication_drives'] = 0.0
 
+        # 6.6 INTERRUPTION CHECK: Evaluate urgent mid-turn interruption
+        if self._should_run('interruption_check'):
+            try:
+                step_start = time.time()
+                await self._check_interruption()
+                subsystem_timings['interruption_check'] = (time.time() - step_start) * 1000
+                self._record_ok('interruption_check')
+            except Exception as e:
+                logger.error(f"Interruption check step failed: {e}", exc_info=True)
+                subsystem_timings['interruption_check'] = 0.0
+                self._record_err('interruption_check', e)
+        else:
+            subsystem_timings['interruption_check'] = 0.0
+
+        # 6.7 COMMUNICATION DECISION: Evaluate SPEAK/SILENCE/DEFER from drives + inhibitions
+        if self._should_run('communication_decision'):
+            try:
+                step_start = time.time()
+                await self._evaluate_communication_decision()
+                subsystem_timings['communication_decision'] = (time.time() - step_start) * 1000
+                self._record_ok('communication_decision')
+            except Exception as e:
+                logger.error(f"Communication decision step failed: {e}", exc_info=True)
+                subsystem_timings['communication_decision'] = 0.0
+                self._record_err('communication_decision', e)
+        else:
+            subsystem_timings['communication_decision'] = 0.0
+
         # 7. AUTONOMOUS INITIATION: Check for autonomous speech triggers
         if self._should_run('autonomous_initiation'):
             try:
@@ -536,6 +564,118 @@ class CycleExecutor:
             self.state.workspace.add_goal(autonomous_goal)
             logger.info(f"🗣️ Autonomous speech goal added: {autonomous_goal.description}")
     
+    async def _check_interruption(self) -> None:
+        """
+        Check if an urgent interruption is warranted during human turn.
+
+        Evaluates the InterruptionSystem and, if an interruption fires, injects
+        a high-priority SPEAK_AUTONOMOUS goal with interruption metadata so the
+        language output can prefix with an appropriate interruption marker.
+        """
+        if not hasattr(self.subsystems, 'interruption'):
+            return
+
+        snapshot = self.state.workspace.broadcast()
+        emotional_state = self.subsystems.affect.get_state()
+
+        # Determine if human is currently speaking via rhythm model
+        is_human_speaking = False
+        if hasattr(self.subsystems, 'communication_drives'):
+            rhythm = getattr(self.subsystems.communication_inhibitions, 'rhythm_model', None)
+            if rhythm is not None:
+                from ..communication.rhythm import ConversationPhase
+                rhythm.update_phase()
+                is_human_speaking = rhythm.current_phase == ConversationPhase.HUMAN_SPEAKING
+
+        urges = []
+        if hasattr(self.subsystems, 'communication_drives'):
+            urges = self.subsystems.communication_drives.active_urges
+
+        request = self.subsystems.interruption.evaluate(
+            workspace_state=snapshot,
+            emotional_state=emotional_state,
+            active_urges=urges,
+            is_human_speaking=is_human_speaking
+        )
+
+        if request is not None:
+            from ..workspace import Goal
+            goal = Goal(
+                type=GoalType.SPEAK_AUTONOMOUS,
+                description=f"Interruption: {request.content_hint}"[:80],
+                priority=min(1.0, request.urgency),
+                progress=0.0,
+                metadata={
+                    "trigger": "interruption",
+                    "interruption_reason": request.reason.value,
+                    "interruption": True,
+                    "content_hint": request.content_hint,
+                    "autonomous": True
+                }
+            )
+            self.state.workspace.add_goal(goal)
+            self.subsystems.interruption.record_interruption(request)
+            logger.info(
+                f"⚡ Interruption triggered: {request.reason.value} "
+                f"(urgency={request.urgency:.2f})"
+            )
+
+    async def _evaluate_communication_decision(self) -> None:
+        """
+        Evaluate communication decision from drives vs inhibitions.
+
+        Calls CommunicationDecisionLoop.evaluate() and, on a SPEAK decision
+        that originates from proactive drives (no existing RESPOND_TO_USER goal),
+        injects a SPEAK_AUTONOMOUS goal into the workspace so it flows through
+        the normal action → execute_speak_autonomous → output_queue pipeline.
+        """
+        if not hasattr(self.subsystems, 'communication_decision'):
+            return
+
+        # Skip if there's already a pending user-response or autonomous goal
+        snapshot = self.state.workspace.broadcast()
+        has_response_goal = any(
+            g.type in (GoalType.RESPOND_TO_USER, GoalType.SPEAK_AUTONOMOUS)
+            for g in snapshot.goals
+        )
+        if has_response_goal:
+            return
+
+        # Gather state for evaluation
+        emotional_state = self.subsystems.affect.get_state()
+        goals = list(self.state.workspace.current_goals)
+        memories = getattr(self.state.workspace, 'attended_memories', [])
+
+        result = self.subsystems.communication_decision.evaluate(
+            workspace_state=snapshot,
+            emotional_state=emotional_state,
+            goals=goals,
+            memories=memories
+        )
+
+        from ..communication import CommunicationDecision
+        if result.decision == CommunicationDecision.SPEAK:
+            # Build metadata from the winning urge
+            metadata = {"trigger": "communication_drive", "autonomous": True}
+            description = "Proactive communication"
+
+            if result.urge:
+                metadata["drive_type"] = result.urge.drive_type.value
+                if result.urge.content:
+                    metadata["suggested_content"] = result.urge.content
+                description = f"Proactive: {result.urge.reason}"
+
+            from ..workspace import Goal
+            goal = Goal(
+                type=GoalType.SPEAK_AUTONOMOUS,
+                description=description[:80],
+                priority=min(1.0, result.confidence * 0.8),
+                progress=0.0,
+                metadata=metadata
+            )
+            self.state.workspace.add_goal(goal)
+            logger.info(f"💬 Communication decision SPEAK → goal added: {description[:60]}")
+
     async def _compute_communication_drives(self) -> None:
         """
         Compute internal communication drives from current state.

@@ -310,6 +310,15 @@ class ActionSubsystem:
                     parameters={"goal_id": goal.id},
                     reason="Self-reflection requested"
                 ))
+
+            elif goal.type == GoalType.SPEAK_AUTONOMOUS:
+                candidates.append(Action(
+                    type=ActionType.SPEAK_AUTONOMOUS,
+                    priority=goal.priority,
+                    parameters={"goal_id": goal.id},
+                    reason="Autonomous speech triggered",
+                    metadata=goal.metadata
+                ))
         
         # 2. Emotion-driven actions
         valence = snapshot.emotions.get("valence", 0.0)

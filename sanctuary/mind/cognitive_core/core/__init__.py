@@ -144,6 +144,7 @@ class CognitiveCore:
             "action": self.subsystems.reinitialize_action,
             "meta_cognition": self.subsystems.reinitialize_meta_cognition,
             "communication_drives": self.subsystems.reinitialize_communication_drives,
+            "communication_decision": self.subsystems.reinitialize_communication_drives,
             "autonomous_initiation": self.subsystems.reinitialize_autonomous_initiation,
             "bottleneck_detection": self.subsystems.reinitialize_bottleneck_detector,
             "temporal_context": self.subsystems.reinitialize_temporal_grounding,
