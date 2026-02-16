@@ -50,6 +50,18 @@ from .proactive import (
     OutreachTrigger
 )
 
+from .interruption import (
+    InterruptionSystem,
+    InterruptionRequest,
+    InterruptionReason
+)
+
+from .reflection import (
+    CommunicationReflectionSystem,
+    CommunicationReflection,
+    ReflectionVerdict
+)
+
 __all__ = [
     'CommunicationDriveSystem',
     'CommunicationUrge',
@@ -71,5 +83,11 @@ __all__ = [
     'ConversationTurn',
     'ProactiveInitiationSystem',
     'OutreachOpportunity',
-    'OutreachTrigger'
+    'OutreachTrigger',
+    'InterruptionSystem',
+    'InterruptionRequest',
+    'InterruptionReason',
+    'CommunicationReflectionSystem',
+    'CommunicationReflection',
+    'ReflectionVerdict'
 ]

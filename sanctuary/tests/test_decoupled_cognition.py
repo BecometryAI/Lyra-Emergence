@@ -400,6 +400,7 @@ class TestAcceptanceCriteria:
         assert elapsed < 0.01  # Should be nearly instant
     
     @pytest.mark.asyncio
+    @pytest.mark.timeout(60)
     async def test_system_runs_100_cycles_no_input(self):
         """Verify system can run 100+ cycles with no human input."""
         from mind.cognitive_core import CognitiveCore

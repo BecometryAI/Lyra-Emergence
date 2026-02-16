@@ -240,6 +240,20 @@ class SubsystemCoordinator:
         else:
             logger.debug("💬 Communication decision loop initialized (legacy mode)")
 
+        # Initialize interruption system for urgent mid-turn communication
+        from ..communication import InterruptionSystem
+        self.interruption = InterruptionSystem(
+            config=config.get("communication", {}).get("interruption", {})
+        )
+        logger.debug("💬 Interruption system initialized")
+
+        # Initialize communication reflection system (post-hoc evaluation)
+        from ..communication import CommunicationReflectionSystem
+        self.communication_reflection = CommunicationReflectionSystem(
+            config=config.get("communication", {}).get("reflection", {})
+        )
+        logger.debug("💬 Communication reflection system initialized")
+
         # Initialize LLM clients for language interfaces
         self._initialize_llm_clients()
         
