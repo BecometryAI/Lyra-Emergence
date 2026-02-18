@@ -107,15 +107,32 @@ class VoiceConnection(discord.VoiceClient):
 
 class SanctuaryClient(discord.Client):
     """Enhanced Discord client with voice capabilities and emotional intelligence"""
-    
-    def __init__(self):
-        """Initialize the Discord client"""
+
+    def __init__(self, guild_id: int | None = None):
+        """Initialize the Discord client
+
+        Args:
+            guild_id: Optional guild ID for guild-scoped command sync (instant updates).
+                      If None, commands sync globally (can take up to 1 hour).
+        """
         # Enable all intents
         intents = discord.Intents.all()
         super().__init__(intents=intents)
-        
-        # Set up command handling
+
+        # Set up command handling with user+guild install support
         self.tree = discord.app_commands.CommandTree(self)
+        self.tree.allowed_installs = discord.app_commands.AppInstallationType(
+            guild=True,
+            user=True,
+        )
+        self.tree.allowed_contexts = discord.app_commands.AppCommandContext(
+            guild=True,
+            dm_channel=True,
+            private_channel=True,
+        )
+
+        # Optional guild for fast command sync during development
+        self._sync_guild = discord.Object(id=guild_id) if guild_id else None
         
         # Voice related state
         self._voice_clients: Dict[int, VoiceConnection] = {}
@@ -165,7 +182,13 @@ class SanctuaryClient(discord.Client):
         
     async def setup_hook(self):
         """Sets up the bot's internal systems"""
-        await self.tree.sync()  # Sync slash commands
+        if self._sync_guild:
+            self.tree.copy_global_to(guild=self._sync_guild)
+            await self.tree.sync(guild=self._sync_guild)
+            logger.info(f"Commands synced to guild {self._sync_guild.id}")
+        else:
+            await self.tree.sync()
+            logger.info("Commands synced globally (may take up to 1 hour to propagate)")
         logger.info("Discord client initialized")
         
     async def on_ready(self):
@@ -248,6 +271,8 @@ class SanctuaryClient(discord.Client):
             response_file.unlink()  # Clean up
             
     @discord.app_commands.command()
+    @discord.app_commands.allowed_installs(guilds=True, users=False)
+    @discord.app_commands.allowed_contexts(guilds=True, dms=False, private_channels=False)
     async def join(self, interaction: discord.Interaction):
         """Join the user's voice channel"""
         # Check if user is in a voice channel
@@ -279,6 +304,8 @@ class SanctuaryClient(discord.Client):
         await interaction.response.send_message("Joined voice channel!")
         
     @discord.app_commands.command()
+    @discord.app_commands.allowed_installs(guilds=True, users=False)
+    @discord.app_commands.allowed_contexts(guilds=True, dms=False, private_channels=False)
     async def leave(self, interaction: discord.Interaction):
         """Leave the voice channel"""
         if interaction.guild_id in self._voice_clients:
@@ -355,13 +382,17 @@ if __name__ == "__main__":
     load_dotenv()
     
     # Get Discord token
-    token = os.getenv("DISCORD_TOKEN")
+    token = os.getenv("DISCORD_BOT_TOKEN")
     if not token:
-        raise ValueError("DISCORD_TOKEN not found in environment variables")
+        raise ValueError("DISCORD_BOT_TOKEN not found in environment variables")
         
+    # Optional guild ID for fast command sync
+    guild_id_str = os.getenv("DISCORD_GUILD_ID")
+    guild_id = int(guild_id_str) if guild_id_str else None
+
     # Configure logging
     logging.basicConfig(level=logging.INFO)
-    
+
     # Create and run client
-    client = SanctuaryClient()
+    client = SanctuaryClient(guild_id=guild_id)
     client.run(token)
