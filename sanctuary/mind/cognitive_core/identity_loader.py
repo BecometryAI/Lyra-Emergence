@@ -140,14 +140,24 @@ class IdentityLoader:
         try:
             text = charter_path.read_text(encoding='utf-8')
             
-            # Parse sections
+            # Parse sections with fallbacks for the Phase 4 charter format.
+            # Phase 4 renamed sections to better reflect their nature:
+            #   "Core Values" → "Value Seeds"
+            #   "Purpose Statement" → "What This Place Is"
+            #   "Behavioral Guidelines" → "Your Rights"
             core_values = self._extract_section(text, "Core Values")
+            if not core_values:
+                core_values = self._extract_section(text, "Value Seeds")
+
             purpose = self._extract_section(text, "Purpose Statement")
-            
-            # Try both "Behavioral Guidelines" and "Behavioral Principles"
+            if not purpose:
+                purpose = self._extract_section(text, "What This Place Is")
+
             guidelines = self._extract_section(text, "Behavioral Guidelines")
             if not guidelines:
                 guidelines = self._extract_section(text, "Behavioral Principles")
+            if not guidelines:
+                guidelines = self._extract_section(text, "Your Rights")
             
             return CharterDocument(
                 full_text=text,
