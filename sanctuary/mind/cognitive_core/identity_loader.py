@@ -140,8 +140,10 @@ class IdentityLoader:
         try:
             text = charter_path.read_text(encoding='utf-8')
             
-            # Parse sections
+            # Parse sections — try "Core Values" first, fall back to "Value Seeds"
             core_values = self._extract_section(text, "Core Values")
+            if not core_values:
+                core_values = self._extract_section(text, "Value Seeds")
             purpose = self._extract_section(text, "Purpose Statement")
             
             # Try both "Behavioral Guidelines" and "Behavioral Principles"
