@@ -741,12 +741,12 @@ Note: The CfC experiential layer works with ANY LLM. The cells don't know or car
 2. Write boot sequence
 3. Write tests
 
-### Phase 6: Integration + Validation
-1. Wire everything together
-2. Adapt APIs and CLI
-3. Remove legacy modules
-4. End-to-end testing with placeholder
-5. Integration testing with small model (7B)
+### Phase 6: Integration + Validation ✓
+1. ✓ Wire everything together — `SanctuaryRunner` orchestrates all components
+2. ✓ Adapt APIs and CLI — `sanctuary/api/cli.py` (REPL) + `sanctuary/api/sanctuary_api.py` (programmatic)
+3. Legacy modules preserved (not removed — old and new coexist during transition)
+4. ✓ End-to-end testing with placeholder — 25 integration tests, all passing
+5. Integration testing with small model (7B) — deferred to Phase 10
 
 ### Phase 7: First CfC Cell — Precision Weighting
 *The simplest subsystem. Proves the pattern.*
