@@ -50,8 +50,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument(
         "--cycle-delay",
         type=float,
-        default=0.1,
-        help="Seconds between cognitive cycles (default: 0.1)",
+        default=2.0,
+        help="Seconds between cognitive cycles (default: 2.0)",
     )
     parser.add_argument(
         "--data-dir",
@@ -123,7 +123,7 @@ class SanctuaryCLI:
         while not self._shutting_down:
             try:
                 line = await asyncio.to_thread(self._read_input)
-            except (EOFError, KeyboardInterrupt):
+            except (EOFError, KeyboardInterrupt, asyncio.CancelledError):
                 break
 
             if line is None:
@@ -282,8 +282,8 @@ Anything else is sent as user input to the cognitive system.
 async def main(argv=None) -> int:
     args = parse_args(argv)
 
-    # Configure logging
-    level = logging.DEBUG if args.verbose else logging.INFO
+    # Configure logging — WARNING by default for clean output, INFO with -v
+    level = logging.DEBUG if args.verbose else logging.WARNING
     logging.basicConfig(
         level=level,
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
@@ -307,6 +307,8 @@ async def main(argv=None) -> int:
     try:
         await cli.start()
         await cli.run_repl()
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        await cli.shutdown()
     except Exception as e:
         logger.error("Fatal error: %s", e, exc_info=True)
         return 1
@@ -316,7 +318,11 @@ async def main(argv=None) -> int:
 
 def run():
     """Synchronous entry point."""
-    sys.exit(asyncio.run(main()))
+    try:
+        sys.exit(asyncio.run(main()))
+    except KeyboardInterrupt:
+        print("\n[sanctuary] Goodbye.")
+        sys.exit(0)
 
 
 if __name__ == "__main__":
