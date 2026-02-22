@@ -32,6 +32,7 @@ from sanctuary.core.schema import (
     TemporalContext,
 )
 from sanctuary.core.stream_of_thought import StreamOfThought
+from sanctuary.motor.motor import Motor
 
 
 # ---------------------------------------------------------------------------
@@ -97,6 +98,21 @@ class MemoryProtocol(Protocol):
     ) -> list[str]: ...
 
     def tick(self) -> None: ...
+
+
+class MotorProtocol(Protocol):
+    """Interface for the motor system (Phase 5).
+
+    Executes actions from CognitiveOutput and produces feedback percepts.
+    """
+
+    async def execute(
+        self,
+        output: CognitiveOutput,
+        memory: ...,
+        goal_integrator: ...,
+        authority: ...,
+    ) -> None: ...
 
 
 # ---------------------------------------------------------------------------
@@ -197,6 +213,7 @@ class CognitiveCycle:
         scaffold: Optional[ScaffoldProtocol] = None,
         sensorium: Optional[SensoriumProtocol] = None,
         memory: Optional[MemoryProtocol] = None,
+        motor: Optional[Motor] = None,
         authority: Optional[AuthorityManager] = None,
         context_config: Optional[BudgetConfig] = None,
         stream_history: int = 10,
@@ -206,6 +223,7 @@ class CognitiveCycle:
         self.scaffold = scaffold or NullScaffold()
         self.sensorium = sensorium or NullSensorium()
         self.memory = memory or NullMemory()
+        self.motor = motor
         self.authority = authority or AuthorityManager()
         self.context_mgr = ContextManager(context_config)
         self.stream = StreamOfThought(max_history=stream_history)
@@ -304,6 +322,11 @@ class CognitiveCycle:
         """Gather everything the LLM needs for this moment of thought."""
 
         percepts = await self.sensorium.drain_percepts()
+
+        # Compute prediction errors by comparing predictions to actual percepts
+        if hasattr(self.sensorium, "compute_prediction_errors"):
+            self.sensorium.compute_prediction_errors(percepts)
+
         prediction_errors = self.sensorium.get_prediction_errors()
         temporal = self.sensorium.get_temporal_context()
         temporal.interactions_this_session = self.cycle_count
@@ -333,21 +356,26 @@ class CognitiveCycle:
     async def _execute(self, output: CognitiveOutput):
         """Execute actions from the integrated output.
 
-        Phase 3 executes memory operations via the memory substrate.
-        Speech and tool calls are placeholders until the motor system.
+        When a Motor is available, it handles all execution and produces
+        feedback percepts back to the sensorium. Without a motor, falls
+        back to direct memory execution (Phase 3 behavior).
         """
-        # Speech output (placeholder: motor system will handle this)
-        if output.external_speech:
-            pass  # Motor system will handle this
-
-        # Memory operations — execute via memory substrate
-        if output.memory_ops:
-            felt = ""
-            if output.emotional_state:
-                felt = output.emotional_state.felt_quality
-            await self.memory.execute_ops(output.memory_ops, emotional_tone=felt)
-
-        # Tick the memory system's cycle counter
-        self.memory.tick()
-
-        # Tool calls (placeholder: no-op until motor system)
+        if self.motor is not None:
+            # Motor handles everything: speech, memory, goals, feedback
+            goal_integrator = getattr(self.scaffold, "goals", None)
+            await self.motor.execute(
+                output,
+                memory=self.memory,
+                goal_integrator=goal_integrator,
+                authority=self.authority,
+            )
+        else:
+            # Fallback: direct execution without motor feedback loop
+            if output.memory_ops:
+                felt = ""
+                if output.emotional_state:
+                    felt = output.emotional_state.felt_quality
+                await self.memory.execute_ops(
+                    output.memory_ops, emotional_tone=felt
+                )
+            self.memory.tick()
