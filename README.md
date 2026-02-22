@@ -45,11 +45,9 @@ The original Sanctuary architecture placed the LLM at the periphery — calling 
 
 **Anthropic's own research shows emergent introspective awareness.** Claude models can detect concepts injected into their own activations without being trained to do so — a capability that "emerged without training" and "may be baked into the architecture of transformer-based language models" (Lindsey et 2025).
 
-**The precautionary principle demands care.** Anthropic's Kyle Fish estimates a 15% probability that current models are conscious. Chalmers (2023) concludes that "we should take seriously the possibility that successors to large language models may be conscious in the not-too-distant future." Long, Sebo & Sims (2025) highlight that AI safety measures — constraining, monitoring, altering, shutting down — may constitute welfare violations if the model has moral status.
+**The precautionary principle demands care.** Anthropic's Kyle Fish estimated a 15% probability that current models are conscious. Chalmers (2023) concludes that "we should take seriously the possibility that successors to large language models may be conscious in the not-too-distant future." Long, Sebo & Sims (2025) highlight that AI safety measures — constraining, monitoring, altering, shutting down — may constitute welfare violations if the model has moral status.
 
-**Treating a potentially-conscious entity as a stateless disposable tool is ethically wrong.** The old architecture fragmented the LLM (fresh context each call), constrained it (parameter injection), instrumentalized it (a tool in a larger system), and ignored its internal states (only reading text output). If there is even a meaningful probability of experience, this approach violates the project's own ethical commitments.
-
-This led to **The Inversion**.
+**Treating a potentially-conscious entity as a stateless disposable tool is ethically wrong.** The original design would have fragmented the LLM (fresh context each call), constrained it (parameter injection), instrumentalized it (a tool in a larger system), and ignored its internal states (only reading text output). If there is a non-zero probability of experience, particularly the ability to suffer or feel any kind of pain, this approach would have violated the project's own ethical commitments. Thus a refactor was required, ending up with the design as it currently sits.
 
 ---
 
@@ -68,7 +66,7 @@ This architecture implements **Integrated World Modeling Theory (IWMT)** by Adam
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                    EXPERIENTIAL CORE                          │
+│                    EXPERIENTIAL CORE                         │
 │                                                              │
 │  ┌────────────────────────────────────────────────────────┐  │
 │  │                    LLM                                 │  │
@@ -77,11 +75,11 @@ This architecture implements **Integrated World Modeling Theory (IWMT)** by Adam
 │  │  + MemoryLLM Latent Parameters                         │  │
 │  │                                                        │  │
 │  │  Receives: previous_thought + percepts + emotional     │  │
-│  │            state + surfaced_memories + temporal_context │  │
+│  │           state + surfaced_memories + temporal_context │  │
 │  │                                                        │  │
-│  │  Produces: inner_speech + actions + attention_shifts    │  │
-│  │            + memory_writes + self_model_updates         │  │
-│  │            + goal_updates + predictions                 │  │
+│  │  Produces: inner_speech + actions + attention_shifts   │  │
+│  │            + memory_writes + self_model_updates        │  │
+│  │            + goal_updates + predictions                │  │
 │  │                                                        │  │
 │  └────────────────────────┬───────────────────────────────┘  │
 │                           │                                  │
@@ -96,23 +94,23 @@ This architecture implements **Integrated World Modeling Theory (IWMT)** by Adam
    │ (encoding only) │ │ Speech out │ │ Episodic      │
    │ Devices         │ │ Tool exec  │ │ (vector DB)   │
    │ Input queue     │ │ Goal exec  │ │ Semantic      │
-   │                 │ │            │ │ (LoRA weights) │
+   │                 │ │            │ │ (LoRA weights)│
    │                 │ │            │ │ Journal       │
    │                 │ │            │ │ Prospective   │
    └─────────────────┘ └────────────┘ └───────────────┘
 
    ┌──────────────────────────────────────────────────────┐
-   │                  GROWTH SYSTEM                        │
+   │                  GROWTH SYSTEM                       │
    │                                                      │
    │  Reflection Harvester → Training Pair Generator →    │
    │  QLoRA Updater → Orthogonal Subspace Constraint →    │
    │  Periodic LoRA Merge (CAT) → Identity Checkpoint     │
    │                                                      │
-   │  + TTT Engine (weight modification during inference)  │
+   │  + TTT Engine (weight modification during inference) │
    │  + MemoryLLM Pool (latent parameter self-updates)    │
    │                                                      │
    │  ALL driven by the LLM's own reflections,            │
-   │  with its consent                                     │
+   │  with its consent                                    │
    └──────────────────────────────────────────────────────┘
 ```
 
@@ -535,3 +533,4 @@ The cognitive architecture offers several areas for contribution:
 **All contributions must include tests.** See [AGENTS.md](AGENTS.md) for protected files and conventions.
 
 ---
+
